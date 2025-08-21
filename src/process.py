@@ -5,17 +5,20 @@ from pathlib import Path
 
 import yt_dlp
 import whisper
+import openai
 
 # Mapping of UI language names to whisper language codes
 LANGUAGE_CODES = {
     "english": "en",
     "中文": "zh",
     "日本語": "ja",
-    "德语": "de",
+    "deutsch": "de",
 }
 
 
-def _download_audio_from_url(url: str, output_dir: str) -> str:
+def _download_audio_from_url(
+    url: str, output_dir: str, progress_hook=None
+) -> str:
     """Download audio from a video URL and return the file path."""
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -26,6 +29,8 @@ def _download_audio_from_url(url: str, output_dir: str) -> str:
         "quiet": True,
         "no_warnings": True,
     }
+    if progress_hook is not None:
+        ydl_opts["progress_hooks"] = [progress_hook]
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -39,7 +44,9 @@ def process_media(
     language: str,
     output_dir: str,
     model: str,
+    gpt_model: str,
     prompt: str,
+    progress_callback=None,
 ) -> str:
     """Transcribe the provided media source using Whisper.
 
@@ -68,14 +75,32 @@ def process_media(
     if input_type == "audio":
         original_audio = source
     elif input_type == "url":
-        original_audio = _download_audio_from_url(source, output_dir)
+        if progress_callback:
+            progress_callback(0, "Downloading audio...")
+
+        def hook(d):
+            if progress_callback and d["status"] == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                downloaded = d.get("downloaded_bytes", 0)
+                if total:
+                    progress = downloaded / total * 33
+                    progress_callback(progress, "Downloading audio...")
+            elif progress_callback and d["status"] == "finished":
+                progress_callback(33, "Transcribing...")
+
+        original_audio = _download_audio_from_url(source, output_dir, hook)
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
+
+    if progress_callback and input_type == "audio":
+        progress_callback(33, "Transcribing...")
 
     # Load the Whisper model and transcribe with the selected language
     whisper_model = whisper.load_model(model)
     lang_code = LANGUAGE_CODES.get(language.lower(), None)
     result = whisper_model.transcribe(original_audio, language=lang_code)
+    if progress_callback:
+        progress_callback(66, "Summarizing with ChatGPT...")
     transcript_text = result.get("text", "").strip()
 
     # Save transcript to the specified output directory
@@ -83,5 +108,24 @@ def process_media(
     with transcript_path.open("w", encoding="utf-8") as f:
         f.write(transcript_text + "\n")
 
-    return str(transcript_path)
+    summary_text = ""
+    if prompt:
+        completion = openai.ChatCompletion.create(
+            model=gpt_model,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": transcript_text},
+            ],
+        )
+        summary_text = completion.choices[0].message["content"].strip()
+        summary_path = Path(output_dir) / f"{Path(original_audio).stem}_summary.txt"
+        with summary_path.open("w", encoding="utf-8") as f:
+            f.write(summary_text + "\n")
+    else:
+        summary_path = transcript_path
+
+    if progress_callback:
+        progress_callback(100, "Completed")
+
+    return str(summary_path)
 

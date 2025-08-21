@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 
 from config import get_default_output_dir, set_default_output_dir
 from process import process_media
@@ -40,8 +40,15 @@ def toggle_input_fields() -> None:
 def run() -> None:
     """Invoke the main processing function with the provided parameters."""
     source = url_var.get() if input_type_var.get() == "url" else audio_file_var.get()
-    status_var.set("Transcribing...")
-    root.update_idletasks()
+
+    def update_progress(percent: float, status: str | None = None) -> None:
+        progress_var.set(percent)
+        if status is not None:
+            status_var.set(status)
+        root.update_idletasks()
+
+    progress_var.set(0)
+    update_progress(0, "Starting...")
     try:
         transcript = process_media(
             source,
@@ -49,9 +56,12 @@ def run() -> None:
             language_var.get(),
             output_dir_var.get(),
             whisper_model_var.get(),
+            gpt_model_var.get(),
             prompt_var.get(),
+            progress_callback=update_progress,
         )
         status_var.set(f"Completed: {transcript}")
+        progress_var.set(100)
     except Exception as exc:  # pragma: no cover - GUI error path
         status_var.set("Error")
         messagebox.showerror("Error", str(exc))
@@ -90,7 +100,7 @@ audio_browse = tk.Button(root, text="Browse", command=browse_audio_file)
 audio_browse.grid(row=2, column=2, padx=5, pady=5)
 
 # Language dropdown
-languages = ["English", "中文", "日本語", "德语"]
+languages = ["English", "中文", "日本語", "Deutsch"]
 language_var = tk.StringVar(value=languages[0])
 tk.Label(root, text="Language:").grid(row=3, column=0, sticky="e")
 tk.OptionMenu(root, language_var, *languages).grid(
@@ -129,9 +139,15 @@ tk.Entry(root, textvariable=prompt_var, width=50).grid(row=7, column=1, padx=5, 
 run_button = tk.Button(root, text="Run", command=run)
 run_button.grid(row=8, column=1, pady=10)
 
+# Progress bar
+progress_var = tk.DoubleVar(value=0)
+ttk.Progressbar(root, variable=progress_var, maximum=100).grid(
+    row=9, column=0, columnspan=3, padx=5, pady=5, sticky="we"
+)
+
 # Status label
 status_var = tk.StringVar(value="")
-tk.Label(root, textvariable=status_var).grid(row=9, column=1, pady=5)
+tk.Label(root, textvariable=status_var).grid(row=10, column=1, pady=5)
 
 toggle_input_fields()
 
