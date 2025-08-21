@@ -73,8 +73,9 @@ def start_transcription() -> None:
             root.after(0, lambda: transcript_text.insert(tk.END, text))
             root.after(0, lambda: transcribe_status_var.set(f"Saved transcript: {path}"))
         except Exception as exc:  # pragma: no cover - GUI error path
+            error_message = str(exc)
             root.after(0, lambda: transcribe_status_var.set("Error"))
-            root.after(0, lambda: messagebox.showerror("Error", str(exc)))
+            root.after(0, lambda msg=error_message: messagebox.showerror("Error", msg))
         finally:
             set_default_output_dir(output_dir_var.get())
 
@@ -113,8 +114,9 @@ def start_summary() -> None:
             root.after(0, lambda: summary_output.insert(tk.END, text))
             root.after(0, lambda: summary_status_var.set(f"Saved summary: {summary_path}"))
         except Exception as exc:  # pragma: no cover - GUI error path
+            error_message = str(exc)
             root.after(0, lambda: summary_status_var.set("Error"))
-            root.after(0, lambda: messagebox.showerror("Error", str(exc)))
+            root.after(0, lambda msg=error_message: messagebox.showerror("Error", msg))
 
     threading.Thread(target=task, daemon=True).start()
 
