@@ -1,32 +1,18 @@
-"""Utilities for downloading, normalizing and transcribing audio."""
+"""Utilities for downloading and transcribing audio."""
 from __future__ import annotations
 
 from pathlib import Path
-import tempfile
 
-import ffmpeg
 import yt_dlp
 import whisper
 
 # Mapping of UI language names to whisper language codes
 LANGUAGE_CODES = {
     "english": "en",
-    "spanish": "es",
-    "french": "fr",
-    "german": "de",
+    "中文": "zh",
+    "日本語": "ja",
+    "德语": "de",
 }
-
-
-def _unify_audio_format(audio_path: str) -> str:
-    """Convert an arbitrary audio file to WAV so Whisper can consume it."""
-    temp_wav = Path(tempfile.mkstemp(suffix=".wav")[1])
-    (
-        ffmpeg.input(audio_path)
-        .output(str(temp_wav), format="wav")
-        .overwrite_output()
-        .run(quiet=True)
-    )
-    return str(temp_wav)
 
 
 def _download_audio_from_url(url: str, output_dir: str) -> str:
@@ -39,18 +25,11 @@ def _download_audio_from_url(url: str, output_dir: str) -> str:
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        path = Path(ydl.prepare_filename(info)).with_suffix(".mp3")
+        path = Path(ydl.prepare_filename(info))
         return str(path)
 
 
@@ -74,6 +53,8 @@ def process_media(
         Human-readable language name selected in the GUI.
     output_dir: str
         Directory where the transcript text file will be stored.
+    model: str
+        Name of the Whisper model to use for transcription.
 
     Returns
     -------
@@ -91,21 +72,16 @@ def process_media(
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
 
-    unified = _unify_audio_format(original_audio)
-
     # Load the Whisper model and transcribe with the selected language
-    whisper_model = whisper.load_model("base")
+    whisper_model = whisper.load_model(model)
     lang_code = LANGUAGE_CODES.get(language.lower(), None)
-    result = whisper_model.transcribe(unified, language=lang_code)
+    result = whisper_model.transcribe(original_audio, language=lang_code)
     transcript_text = result.get("text", "").strip()
 
     # Save transcript to the specified output directory
     transcript_path = Path(output_dir) / f"{Path(original_audio).stem}.txt"
     with transcript_path.open("w", encoding="utf-8") as f:
         f.write(transcript_text + "\n")
-
-    # Cleanup temporary WAV file
-    Path(unified).unlink(missing_ok=True)
 
     return str(transcript_path)
 

@@ -48,7 +48,7 @@ def run() -> None:
             input_type_var.get(),
             language_var.get(),
             output_dir_var.get(),
-            model_var.get(),
+            whisper_model_var.get(),
             prompt_var.get(),
         )
         status_var.set(f"Completed: {transcript}")
@@ -90,7 +90,7 @@ audio_browse = tk.Button(root, text="Browse", command=browse_audio_file)
 audio_browse.grid(row=2, column=2, padx=5, pady=5)
 
 # Language dropdown
-languages = ["English", "Spanish", "French", "German"]
+languages = ["English", "中文", "日本語", "德语"]
 language_var = tk.StringVar(value=languages[0])
 tk.Label(root, text="Language:").grid(row=3, column=0, sticky="e")
 tk.OptionMenu(root, language_var, *languages).grid(
@@ -107,23 +107,31 @@ tk.Button(root, text="Browse", command=browse_output_dir).grid(
     row=4, column=2, padx=5, pady=5
 )
 
+# Whisper model dropdown
+whisper_models = ["tiny", "base", "small", "medium", "large"]
+whisper_model_var = tk.StringVar(value="small")
+tk.Label(root, text="Whisper Model:").grid(row=5, column=0, sticky="e")
+tk.OptionMenu(root, whisper_model_var, *whisper_models).grid(
+    row=5, column=1, padx=5, pady=5, sticky="w"
+)
+
 # ChatGPT model
-model_var = tk.StringVar(value="gpt-3.5-turbo")
-tk.Label(root, text="ChatGPT Model:").grid(row=5, column=0, sticky="e")
-tk.Entry(root, textvariable=model_var, width=50).grid(row=5, column=1, padx=5, pady=5)
+gpt_model_var = tk.StringVar(value="gpt-3.5-turbo")
+tk.Label(root, text="ChatGPT Model:").grid(row=6, column=0, sticky="e")
+tk.Entry(root, textvariable=gpt_model_var, width=50).grid(row=6, column=1, padx=5, pady=5)
 
 # Prompt
 prompt_var = tk.StringVar()
-tk.Label(root, text="Prompt:").grid(row=6, column=0, sticky="e")
-tk.Entry(root, textvariable=prompt_var, width=50).grid(row=6, column=1, padx=5, pady=5)
+tk.Label(root, text="Prompt:").grid(row=7, column=0, sticky="e")
+tk.Entry(root, textvariable=prompt_var, width=50).grid(row=7, column=1, padx=5, pady=5)
 
 # Run button
 run_button = tk.Button(root, text="Run", command=run)
-run_button.grid(row=7, column=1, pady=10)
+run_button.grid(row=8, column=1, pady=10)
 
 # Status label
 status_var = tk.StringVar(value="")
-tk.Label(root, textvariable=status_var).grid(row=8, column=1, pady=5)
+tk.Label(root, textvariable=status_var).grid(row=9, column=1, pady=5)
 
 toggle_input_fields()
 
