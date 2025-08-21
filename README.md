@@ -1,6 +1,6 @@
 # Video Transcription Summary
 
-This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content.
+This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content. The GUI allows entering a video URL or selecting a local audio file (common formats are converted to WAV so Whisper can process them).
 
 ## Installation
 
