@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import math
 import shutil
 import subprocess
 import tempfile
@@ -47,12 +48,30 @@ def _download_audio_from_url(
         return str(path)
 
 
-def _split_audio(audio_path: str, segment_seconds: int = 180) -> tuple[Path, list[Path]]:
-    """Split ``audio_path`` into ``segment_seconds`` chunks.
+def _get_media_duration(path: str) -> float:
+    """Return the duration of the media file in seconds using ``ffprobe``."""
 
-    Returns a tuple of the temporary directory path and a list of segment files.
-    The caller is responsible for cleaning up the temporary directory.
-    """
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        path,
+    ]
+    try:
+        result = subprocess.run(
+            cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"ffprobe failed to get duration: {e.stderr}") from e
+    return float(result.stdout.strip())
+
+
+def _split_audio(audio_path: str, segment_seconds: float) -> tuple[Path, list[Path]]:
+    """Split ``audio_path`` into chunks of ``segment_seconds`` seconds."""
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="segments_"))
     ext = Path(audio_path).suffix or ".mp3"
@@ -122,7 +141,15 @@ def transcribe_media(
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
 
-    segments_dir, segments = _split_audio(original_audio)
+    duration = _get_media_duration(original_audio)
+    if duration <= 900:
+        segments_dir = None
+        segments = [Path(original_audio)]
+    else:
+        segment_count = math.ceil(duration / 900)
+        segment_time = duration / segment_count
+        segments_dir, segments = _split_audio(original_audio, segment_time)
+
     whisper_model = whisper.load_model(model)
     lang_code = LANGUAGE_CODES.get(language.lower(), None)
     transcripts: list[str] = []
@@ -135,7 +162,8 @@ def transcribe_media(
                 progress = start_progress + (idx / total_segments) * (100 - start_progress)
                 progress_callback(progress, f"Transcribed {idx}/{total_segments} segments")
     finally:
-        shutil.rmtree(segments_dir)
+        if segments_dir is not None:
+            shutil.rmtree(segments_dir)
 
     transcript_text = "\n".join(transcripts).strip()
     transcript_path = Path(output_dir) / f"{Path(original_audio).stem}.txt"
