@@ -1,4 +1,4 @@
-"""Main processing stub for handling video URLs or local audio files."""
+"""Utilities for downloading, normalizing and transcribing audio."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,6 +6,15 @@ import tempfile
 
 import ffmpeg
 import yt_dlp
+import whisper
+
+# Mapping of UI language names to whisper language codes
+LANGUAGE_CODES = {
+    "english": "en",
+    "spanish": "es",
+    "french": "fr",
+    "german": "de",
+}
 
 
 def _unify_audio_format(audio_path: str) -> str:
@@ -52,33 +61,51 @@ def process_media(
     output_dir: str,
     model: str,
     prompt: str,
-) -> None:
-    """Placeholder function representing the core processing pipeline.
+) -> str:
+    """Transcribe the provided media source using Whisper.
 
-    In a full implementation this would download the video, extract audio,
-    generate transcripts and summaries, etc. For now it simply prints the
-    received parameters so the GUI wiring can be verified. If the input is a
-    local audio file it is converted to WAV first so it is compatible with
-    Whisper.
+    Parameters
+    ----------
+    source: str
+        Path to a local audio file or a video URL depending on ``input_type``.
+    input_type: str
+        Either ``"audio"`` for local files or ``"url"`` for remote videos.
+    language: str
+        Human-readable language name selected in the GUI.
+    output_dir: str
+        Directory where the transcript text file will be stored.
+
+    Returns
+    -------
+    str
+        Path to the generated transcript file.
     """
 
-    print("Processing media with parameters:")
-    print(f"Source: {source}")
-    print(f"Input Type: {input_type}")
-    print(f"Language: {language}")
-    print(f"Output Directory: {output_dir}")
-    print(f"ChatGPT Model: {model}")
-    print(f"Prompt: {prompt}")
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    # Determine audio source
     if input_type == "audio":
-        unified = _unify_audio_format(source)
-        print(f"Unified audio file: {unified}")
+        original_audio = source
     elif input_type == "url":
-        try:
-            downloaded = _download_audio_from_url(source, output_dir)
-            print(f"Downloaded audio file: {downloaded}")
-            unified = _unify_audio_format(downloaded)
-            print(f"Unified audio file: {unified}")
-        except Exception as exc:
-            print(f"Error downloading audio: {exc}")
+        original_audio = _download_audio_from_url(source, output_dir)
+    else:
+        raise ValueError(f"Unsupported input type: {input_type}")
+
+    unified = _unify_audio_format(original_audio)
+
+    # Load the Whisper model and transcribe with the selected language
+    whisper_model = whisper.load_model("base")
+    lang_code = LANGUAGE_CODES.get(language.lower(), None)
+    result = whisper_model.transcribe(unified, language=lang_code)
+    transcript_text = result.get("text", "").strip()
+
+    # Save transcript to the specified output directory
+    transcript_path = Path(output_dir) / f"{Path(original_audio).stem}.txt"
+    with transcript_path.open("w", encoding="utf-8") as f:
+        f.write(transcript_text + "\n")
+
+    # Cleanup temporary WAV file
+    Path(unified).unlink(missing_ok=True)
+
+    return str(transcript_path)
 
