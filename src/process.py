@@ -6,11 +6,12 @@ from pathlib import Path
 import yt_dlp
 import whisper
 import openai
-from openai.error import OpenAIError
+from openai import OpenAIError
 
 from config import get_openai_api_key
 
-openai.api_key = get_openai_api_key()
+# Initialise OpenAI client using the new 1.x API style
+client = openai.OpenAI(api_key=get_openai_api_key())
 
 # Mapping of UI language names to whisper language codes
 LANGUAGE_CODES = {
@@ -107,14 +108,14 @@ def summarize_transcript(
     if progress_callback:
         progress_callback(0, "Summarizing with ChatGPT...")
     try:
-        completion = openai.ChatCompletion.create(
+        completion = client.chat.completions.create(
             model=gpt_model,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": transcript_text},
             ],
         )
-        summary_text = completion.choices[0].message["content"].strip()
+        summary_text = completion.choices[0].message.content.strip()
         summary_path = Path(transcript_path).with_name(
             f"{Path(transcript_path).stem}_summary.txt"
         )
