@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 from config import get_default_output_dir, set_default_output_dir
 from process import process_media
@@ -40,14 +40,21 @@ def toggle_input_fields() -> None:
 def run() -> None:
     """Invoke the main processing function with the provided parameters."""
     source = url_var.get() if input_type_var.get() == "url" else audio_file_var.get()
-    process_media(
-        source,
-        input_type_var.get(),
-        language_var.get(),
-        output_dir_var.get(),
-        model_var.get(),
-        prompt_var.get(),
-    )
+    status_var.set("Transcribing...")
+    root.update_idletasks()
+    try:
+        transcript = process_media(
+            source,
+            input_type_var.get(),
+            language_var.get(),
+            output_dir_var.get(),
+            model_var.get(),
+            prompt_var.get(),
+        )
+        status_var.set(f"Completed: {transcript}")
+    except Exception as exc:  # pragma: no cover - GUI error path
+        status_var.set("Error")
+        messagebox.showerror("Error", str(exc))
     set_default_output_dir(output_dir_var.get())
 
 
@@ -113,6 +120,10 @@ tk.Entry(root, textvariable=prompt_var, width=50).grid(row=6, column=1, padx=5, 
 # Run button
 run_button = tk.Button(root, text="Run", command=run)
 run_button.grid(row=7, column=1, pady=10)
+
+# Status label
+status_var = tk.StringVar(value="")
+tk.Label(root, textvariable=status_var).grid(row=8, column=1, pady=5)
 
 toggle_input_fields()
 
