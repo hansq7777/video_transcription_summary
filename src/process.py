@@ -6,6 +6,7 @@ from pathlib import Path
 import yt_dlp
 import whisper
 import openai
+from openai.error import OpenAIError
 
 # Mapping of UI language names to whisper language codes
 LANGUAGE_CODES = {
@@ -108,21 +109,30 @@ def process_media(
     with transcript_path.open("w", encoding="utf-8") as f:
         f.write(transcript_text + "\n")
 
+    # Read back the transcript from disk
+    transcript_text = transcript_path.read_text(encoding="utf-8")
+
     summary_text = ""
+    summary_path = transcript_path
     if prompt:
-        completion = openai.ChatCompletion.create(
-            model=gpt_model,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": transcript_text},
-            ],
-        )
-        summary_text = completion.choices[0].message["content"].strip()
-        summary_path = Path(output_dir) / f"{Path(original_audio).stem}_summary.txt"
-        with summary_path.open("w", encoding="utf-8") as f:
-            f.write(summary_text + "\n")
-    else:
-        summary_path = transcript_path
+        try:
+            completion = openai.ChatCompletion.create(
+                model=gpt_model,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": transcript_text},
+                ],
+            )
+            summary_text = completion.choices[0].message["content"].strip()
+            summary_path = transcript_path.with_name(
+                f"{transcript_path.stem}_summary.txt"
+            )
+            with summary_path.open("w", encoding="utf-8") as f:
+                f.write(summary_text + "\n")
+        except OpenAIError as exc:
+            if progress_callback:
+                progress_callback(100, f"OpenAI API error: {exc}")
+            raise
 
     if progress_callback:
         progress_callback(100, "Completed")
