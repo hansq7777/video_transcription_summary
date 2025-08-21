@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 
 import yt_dlp
 import whisper
@@ -44,6 +47,32 @@ def _download_audio_from_url(
         return str(path)
 
 
+def _split_audio(audio_path: str, segment_seconds: int = 180) -> tuple[Path, list[Path]]:
+    """Split ``audio_path`` into ``segment_seconds`` chunks.
+
+    Returns a tuple of the temporary directory path and a list of segment files.
+    The caller is responsible for cleaning up the temporary directory.
+    """
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix="segments_"))
+    segment_template = tmp_dir / "segment_%03d.mp3"
+    cmd = [
+        "ffmpeg",
+        "-i",
+        audio_path,
+        "-f",
+        "segment",
+        "-segment_time",
+        str(segment_seconds),
+        "-c",
+        "copy",
+        str(segment_template),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    segments = sorted(tmp_dir.glob("segment_*.mp3"))
+    return tmp_dir, segments
+
+
 def transcribe_media(
     source: str,
     input_type: str,
@@ -61,9 +90,11 @@ def transcribe_media(
 
     if input_type == "audio":
         original_audio = source
+        start_progress = 0
         if progress_callback:
             progress_callback(0, "Transcribing...")
     elif input_type == "url":
+        start_progress = 50
         if progress_callback:
             progress_callback(0, "Downloading audio...")
 
@@ -72,20 +103,31 @@ def transcribe_media(
                 total = d.get("total_bytes") or d.get("total_bytes_estimate")
                 downloaded = d.get("downloaded_bytes", 0)
                 if total:
-                    progress = downloaded / total * 50
+                    progress = downloaded / total * start_progress
                     progress_callback(progress, "Downloading audio...")
             elif progress_callback and d["status"] == "finished":
-                progress_callback(50, "Transcribing...")
+                progress_callback(start_progress, "Transcribing...")
 
         original_audio = _download_audio_from_url(source, output_dir, hook)
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
 
+    segments_dir, segments = _split_audio(original_audio)
     whisper_model = whisper.load_model(model)
     lang_code = LANGUAGE_CODES.get(language.lower(), None)
-    result = whisper_model.transcribe(original_audio, language=lang_code)
-    transcript_text = result.get("text", "").strip()
+    transcripts: list[str] = []
+    total_segments = len(segments) or 1
+    try:
+        for idx, segment in enumerate(segments, start=1):
+            result = whisper_model.transcribe(str(segment), language=lang_code)
+            transcripts.append(result.get("text", "").strip())
+            if progress_callback:
+                progress = start_progress + (idx / total_segments) * (100 - start_progress)
+                progress_callback(progress, f"Transcribed {idx}/{total_segments} segments")
+    finally:
+        shutil.rmtree(segments_dir)
 
+    transcript_text = "\n".join(transcripts).strip()
     transcript_path = Path(output_dir) / f"{Path(original_audio).stem}.txt"
     with transcript_path.open("w", encoding="utf-8") as f:
         f.write(transcript_text + "\n")
