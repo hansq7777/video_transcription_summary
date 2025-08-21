@@ -55,7 +55,8 @@ def _split_audio(audio_path: str, segment_seconds: int = 180) -> tuple[Path, lis
     """
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="segments_"))
-    segment_template = tmp_dir / "segment_%03d.mp3"
+    ext = Path(audio_path).suffix or ".mp3"
+    segment_template = tmp_dir / f"segment_%03d{ext}"
     cmd = [
         "ffmpeg",
         "-i",
@@ -68,8 +69,17 @@ def _split_audio(audio_path: str, segment_seconds: int = 180) -> tuple[Path, lis
         "copy",
         str(segment_template),
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    segments = sorted(tmp_dir.glob("segment_*.mp3"))
+    try:
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"ffmpeg failed to split audio: {e.stderr}") from e
+    segments = sorted(tmp_dir.glob(f"segment_*{ext}"))
     return tmp_dir, segments
 
 
