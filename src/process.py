@@ -8,6 +8,10 @@ import whisper
 import openai
 from openai.error import OpenAIError
 
+from config import get_openai_api_key
+
+openai.api_key = get_openai_api_key()
+
 # Mapping of UI language names to whisper language codes
 LANGUAGE_CODES = {
     "english": "en",
