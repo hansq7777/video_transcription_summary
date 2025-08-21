@@ -10,3 +10,10 @@ This project downloads videos, extracts audio, generates transcripts using OpenA
    pip install -r requirements.txt
    ```
 
+3. Configure environment variables in a `.env` file:
+   ```env
+   OPENAI_API_KEY=your_key_here
+   DEFAULT_OUTPUT_DIR=summaries  # Optional custom folder
+   ```
+   The application reads these values using [python-dotenv](https://github.com/theskumar/python-dotenv).
+
