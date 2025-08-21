@@ -2,6 +2,8 @@
 
 This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content. The GUI allows entering a video URL or selecting a local audio file (common formats are converted to WAV so Whisper can process them).
 
+Audio shorter than 15 minutes is transcribed directly. Longer media is split into equal parts of up to 15 minutes each before transcription, and the resulting text is concatenated.
+
 ## Installation
 
 1. Install [ffmpeg](https://ffmpeg.org/) on your system.
