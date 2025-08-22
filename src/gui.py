@@ -7,7 +7,10 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from config import get_default_output_dir, set_default_output_dir
-from process import summarize_transcript, transcribe_media
+from process import summarize_transcript, transcribe_batch
+
+
+audio_files: list[str] = []
 
 
 def browse_output_dir() -> None:
@@ -20,30 +23,42 @@ def browse_output_dir() -> None:
 
 def browse_audio_file() -> None:
     """Open a file chooser and update the audio file selection."""
-    path = filedialog.askopenfilename(
+    paths = filedialog.askopenfilenames(
         filetypes=[("Audio Files", "*.mp3 *.wav *.m4a *.flac *.ogg")]
     )
-    if path:
-        audio_file_var.set(path)
+    if paths:
+        audio_files.clear()
+        audio_files.extend(paths)
+        audio_file_var.set(f"{len(paths)} files selected")
 
 
 def toggle_input_fields() -> None:
     """Enable fields based on the selected input type."""
     if input_type_var.get() == "url":
-        url_entry.config(state="normal")
+        url_text.config(state="normal")
         audio_entry.config(state="disabled")
         audio_browse.config(state="disabled")
     else:
-        url_entry.config(state="disabled")
-        audio_entry.config(state="normal")
+        url_text.config(state="disabled")
+        audio_entry.config(state="readonly")
         audio_browse.config(state="normal")
 
 
 def start_transcription() -> None:
     """Run the transcription step in a background thread."""
-    source = url_var.get() if input_type_var.get() == "url" else audio_file_var.get()
-    if not source:
-        messagebox.showwarning("Missing source", "Please provide a URL or audio file.")
+    if input_type_var.get() == "url":
+        sources = [
+            line.strip()
+            for line in url_text.get("1.0", tk.END).splitlines()
+            if line.strip()
+        ]
+    else:
+        sources = audio_files.copy()
+
+    if not sources:
+        messagebox.showwarning(
+            "Missing source", "Please provide a URL or audio file."
+        )
         return
 
     transcribe_progress_var.set(0)
@@ -59,19 +74,23 @@ def start_transcription() -> None:
 
     def task() -> None:
         try:
-            path = transcribe_media(
-                source,
+            paths = transcribe_batch(
+                sources,
                 input_type_var.get(),
                 language_var.get(),
                 output_dir_var.get(),
                 whisper_model_var.get(),
                 progress_callback=update_progress,
             )
-            transcript_path_var.set(path)
-            text = Path(path).read_text(encoding="utf-8")
+            transcript_path_var.set(paths[0] if paths else "")
+            texts = []
+            for p in paths:
+                t = Path(p).read_text(encoding="utf-8")
+                texts.append(f"--- {Path(p).name} ---\n{t}")
+            combined = "\n\n".join(texts)
             root.after(0, lambda: transcript_text.delete("1.0", tk.END))
-            root.after(0, lambda: transcript_text.insert(tk.END, text))
-            root.after(0, lambda: transcribe_status_var.set(f"Saved transcript: {path}"))
+            root.after(0, lambda: transcript_text.insert(tk.END, combined))
+            root.after(0, lambda: transcribe_status_var.set(f"Saved transcripts: {', '.join(paths)}"))
         except Exception as exc:  # pragma: no cover - GUI error path
             error_message = str(exc)
             root.after(0, lambda: transcribe_status_var.set("Error"))
@@ -145,14 +164,13 @@ tk.Radiobutton(
     command=toggle_input_fields,
 ).grid(row=0, column=2, sticky="w")
 
-url_var = tk.StringVar()
-tk.Label(transcribe_frame, text="Video URL:").grid(row=1, column=0, sticky="e")
-url_entry = tk.Entry(transcribe_frame, textvariable=url_var, width=50)
-url_entry.grid(row=1, column=1, padx=5, pady=2, columnspan=2, sticky="w")
+tk.Label(transcribe_frame, text="Video URLs:").grid(row=1, column=0, sticky="ne")
+url_text = tk.Text(transcribe_frame, height=4, width=50)
+url_text.grid(row=1, column=1, padx=5, pady=2, columnspan=2, sticky="w")
 
 audio_file_var = tk.StringVar()
-tk.Label(transcribe_frame, text="Audio File:").grid(row=2, column=0, sticky="e")
-audio_entry = tk.Entry(transcribe_frame, textvariable=audio_file_var, width=40)
+tk.Label(transcribe_frame, text="Audio Files:").grid(row=2, column=0, sticky="e")
+audio_entry = tk.Entry(transcribe_frame, textvariable=audio_file_var, width=40, state="readonly")
 audio_entry.grid(row=2, column=1, padx=5, pady=2, sticky="w")
 audio_browse = tk.Button(transcribe_frame, text="Browse", command=browse_audio_file)
 audio_browse.grid(row=2, column=2, padx=5, pady=2)
