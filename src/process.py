@@ -63,7 +63,12 @@ def _get_media_duration(path: str) -> float:
     ]
     try:
         result = subprocess.run(
-            cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            cmd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffprobe failed to get duration: {e.stderr}") from e
@@ -95,6 +100,7 @@ def _split_audio(audio_path: str, segment_seconds: float) -> tuple[Path, list[Pa
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffmpeg failed to split audio: {e.stderr}") from e
@@ -174,6 +180,47 @@ def transcribe_media(
         progress_callback(100, "Transcription completed")
 
     return str(transcript_path)
+
+
+def transcribe_batch(
+    sources: list[str],
+    input_type: str,
+    language: str,
+    output_dir: str,
+    model: str,
+    progress_callback=None,
+) -> list[str]:
+    """Transcribe multiple ``sources`` sequentially.
+
+    Each source is processed in order and the resulting transcript paths are
+    returned as a list. Progress is reported as an overall percentage across the
+    entire batch.
+    """
+
+    transcripts: list[str] = []
+    total = len(sources) or 1
+    for index, src in enumerate(sources, start=1):
+        base = (index - 1) * 100 / total
+
+        def cb(p: float, status: str | None = None) -> None:
+            if progress_callback:
+                overall = base + p / total
+                progress_callback(overall, status)
+
+        path = transcribe_media(
+            src,
+            input_type,
+            language,
+            output_dir,
+            model,
+            progress_callback=cb,
+        )
+        transcripts.append(path)
+
+    if progress_callback:
+        progress_callback(100, "Transcription completed")
+
+    return transcripts
 
 
 def summarize_transcript(
