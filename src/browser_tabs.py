@@ -1,7 +1,9 @@
 """Utilities for retrieving and filtering Chrome tab URLs."""
 from __future__ import annotations
 
-import requests
+import json
+from urllib.error import URLError
+from urllib.request import urlopen
 from urllib.parse import urlparse
 from yt_dlp.extractor import gen_extractors
 
@@ -19,14 +21,9 @@ def get_chrome_tabs(port: int = 9222) -> list[str]:
     ``url`` field from each tab description.
     """
     try:
-        response = requests.get(f"http://127.0.0.1:{port}/json", timeout=3)
-        response.raise_for_status()
-    except requests.RequestException:
-        return []
-
-    try:
-        tabs = response.json()
-    except ValueError:
+        with urlopen(f"http://127.0.0.1:{port}/json", timeout=3) as response:
+            tabs = json.load(response)
+    except (URLError, json.JSONDecodeError):
         return []
 
     return [tab.get("url", "") for tab in tabs if tab.get("url")]
