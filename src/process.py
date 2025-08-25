@@ -12,7 +12,11 @@ try:  # pragma: no cover - optional dependency
     import yt_dlp
 except ImportError:  # pragma: no cover - dependency missing
     yt_dlp = None  # type: ignore[assignment]
-import whisper
+
+try:  # pragma: no cover - optional dependency
+    import whisper
+except ImportError:  # pragma: no cover - dependency missing
+    whisper = None  # type: ignore[assignment]
 
 # OpenAI is imported lazily to avoid heavy startup cost when the ChatGPT API
 # is not used.  ``openai`` and ``OpenAIError`` are loaded within
@@ -36,8 +40,13 @@ def get_openai_client():
 
     global client, openai, OpenAIError
     if client is None:
-        import openai as _openai
-        from openai import OpenAIError as _OpenAIError
+        try:
+            import openai as _openai
+            from openai import OpenAIError as _OpenAIError
+        except ImportError as exc:  # pragma: no cover - dependency missing
+            raise RuntimeError(
+                "openai is required for ChatGPT summarisation. Install it via 'pip install openai'."
+            ) from exc
 
         openai = _openai
         OpenAIError = _OpenAIError
@@ -340,6 +349,11 @@ def transcribe_media(
         output_dir = get_default_output_dir()
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    if whisper is None:
+        raise RuntimeError(
+            "openai-whisper is required for transcription. Install it via 'pip install openai-whisper'."
+        )
+
     if input_type == "audio":
         audio_path = source
         start_progress = 0
@@ -476,31 +490,4 @@ def summarize_transcript(
             progress_callback(100, f"{name} - OpenAI API error: {exc}")
         raise
 
-
-def process_media(
-    source: str,
-    input_type: str,
-    language: str,
-    output_dir: str | None,
-    model: str,
-    gpt_model: str,
-    prompt: str,
-    progress_callback=None,
-) -> str:
-    """Backward compatible helper that runs transcription then summary."""
-    if output_dir is None:
-        output_dir = get_default_output_dir()
-    transcript_path = transcribe_media(
-        source,
-        input_type,
-        language,
-        output_dir,
-        model,
-        progress_callback=progress_callback,
-    )
-    if prompt:
-        return summarize_transcript(
-            transcript_path, gpt_model, prompt, progress_callback=progress_callback
-        )
-    return transcript_path
 
