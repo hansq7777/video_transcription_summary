@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from urllib.error import URLError
 from urllib.request import urlopen
 from urllib.parse import urlparse
@@ -36,9 +37,12 @@ def get_chrome_tabs(port: int = 9222) -> list[str]:
 def filter_supported_urls(urls: list[str]) -> list[str]:
     """Filter ``urls`` keeping only those supported by ``yt_dlp`` extractors."""
     if gen_extractors is None:
-        raise RuntimeError(
-            "yt_dlp is required to detect supported URLs. Install it via 'pip install yt-dlp'."
+        warnings.warn(
+            "yt_dlp is required to detect supported URLs. Install it via 'pip install yt-dlp'.",
+            RuntimeWarning,
         )
+        return []
+
     extractors = gen_extractors()
     supported = []
     for url in urls:

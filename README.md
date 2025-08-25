@@ -11,6 +11,9 @@ All downloads and transcription actions are logged to a `work.log` file in the p
    ```bash
    pip install -r requirements.txt
    ```
+   The optional [yt-dlp](https://github.com/yt-dlp/yt-dlp) dependency enables the
+   *Load Tabs* feature to detect supported video sites. If it is missing the
+   application will simply return no tabs.
 3. (Optional) Create a `.env` file to store configuration:
    ```env
    OPENAI_API_KEY=your_key_here
