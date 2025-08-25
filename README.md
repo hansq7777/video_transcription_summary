@@ -30,3 +30,20 @@ The `run_gui.bat` script can launch the GUI without manually activating an envir
 3. If Conda is unavailable, it falls back to a local `venv` if one exists.
 
 Double-click `run_gui.bat` in the project folder. The script runs `src\gui.py` with `pythonw`, so no console window appears. If no suitable environment is found, it displays instructions for creating one.
+
+## Building an Executable
+
+Create a standalone Windows build using [PyInstaller](https://pyinstaller.org/):
+
+1. Install PyInstaller:
+   ```bash
+   pip install pyinstaller
+   ```
+2. Run the build script from the project root:
+   ```bat
+   build_gui_exe.bat
+   ```
+   The script bundles `src\gui.py` along with the `.env` file.
+
+The generated `gui.exe` will be located in the `dist` folder.
+
