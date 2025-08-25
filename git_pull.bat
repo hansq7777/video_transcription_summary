@@ -43,6 +43,6 @@ GOTO :End
 
 :End
 echo.
-echo 操作完成，按任意键关闭窗口...
+echo Operation completed. Press any key to close the window...
 pause >nul
 exit /b %ERRORLEVEL%
