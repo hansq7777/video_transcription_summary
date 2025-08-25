@@ -1,6 +1,6 @@
 # Video Transcription Summary
 
-This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content. The GUI allows entering one or more video URLs or selecting multiple local audio files (common formats are converted to WAV so Whisper can process them). Each source is transcribed in sequence and written to its own transcript file.
+This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content. The GUI allows entering one or more video URLs or selecting multiple local audio files (common formats are converted to WAV so Whisper can process them). Each source is transcribed in sequence and written to its own transcript file. By default, audio downloads and transcripts are saved under the `summaries` folder, while full video downloads go to the `videos` folder.
 
 Audio shorter than 15 minutes is transcribed directly. Longer media is split into equal parts of up to 15 minutes each before transcription, and the resulting text is concatenated.
 
@@ -15,7 +15,8 @@ Audio shorter than 15 minutes is transcribed directly. Longer media is split int
 3. Configure environment variables in a `.env` file:
    ```env
    OPENAI_API_KEY=your_key_here
-   DEFAULT_OUTPUT_DIR=summaries  # Optional custom folder
+   DEFAULT_OUTPUT_DIR=summaries  # Optional custom summaries folder
+   DEFAULT_VIDEO_DIR=videos      # Optional custom video folder
    ```
    The application reads these values using [python-dotenv](https://github.com/theskumar/python-dotenv).
 

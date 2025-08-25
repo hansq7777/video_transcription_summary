@@ -12,7 +12,11 @@ import whisper
 import openai
 from openai import OpenAIError
 
-from config import get_openai_api_key
+from config import (
+    get_openai_api_key,
+    get_default_output_dir,
+    get_default_video_dir,
+)
 
 # Initialise OpenAI client using the new 1.x API style
 client = openai.OpenAI(api_key=get_openai_api_key())
@@ -28,7 +32,7 @@ LANGUAGE_CODES = {
 
 def download_video(
     url: str,
-    output_dir: str,
+    output_dir: str | None = None,
     progress_hook=None,
     format_spec: str = "bestvideo+bestaudio/best",
 ) -> str:
@@ -40,6 +44,8 @@ def download_video(
     ``yt-dlp``.
     """
 
+    if output_dir is None:
+        output_dir = get_default_video_dir()
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     ydl_opts = {
         "format": format_spec,
@@ -86,9 +92,13 @@ def convert_video_to_audio(video_path: str, output_dir: str) -> str:
     return str(audio_path)
 
 
-def download_to_audio(url: str, output_dir: str, progress_callback=None) -> str:
+def download_to_audio(
+    url: str, output_dir: str | None = None, progress_callback=None
+) -> str:
     """Download ``url`` and convert to audio, returning the audio path."""
 
+    if output_dir is None:
+        output_dir = get_default_output_dir()
     if progress_callback:
         progress_callback(0, "Downloading audio...")
 
@@ -113,9 +123,15 @@ def download_to_audio(url: str, output_dir: str, progress_callback=None) -> str:
     return audio_path
 
 
-def download_videos(urls: list[str], output_dir: str, progress_callback=None) -> list[str]:
+def download_videos(
+    urls: list[str],
+    output_dir: str | None = None,
+    progress_callback=None,
+) -> list[str]:
     """Download multiple videos sequentially."""
 
+    if output_dir is None:
+        output_dir = get_default_video_dir()
     videos: list[str] = []
     total = len(urls) or 1
     for index, url in enumerate(urls, start=1):
@@ -138,9 +154,15 @@ def download_videos(urls: list[str], output_dir: str, progress_callback=None) ->
     return videos
 
 
-def convert_to_audio_batch(urls: list[str], output_dir: str, progress_callback=None) -> list[str]:
+def convert_to_audio_batch(
+    urls: list[str],
+    output_dir: str | None = None,
+    progress_callback=None,
+) -> list[str]:
     """Download videos and convert them to audio sequentially."""
 
+    if output_dir is None:
+        output_dir = get_default_output_dir()
     audios: list[str] = []
     total = len(urls) or 1
     for index, url in enumerate(urls, start=1):
@@ -222,7 +244,7 @@ def transcribe_media(
     source: str,
     input_type: str,
     language: str,
-    output_dir: str,
+    output_dir: str | None,
     model: str,
     progress_callback=None,
 ) -> str:
@@ -231,6 +253,8 @@ def transcribe_media(
     Returns the path to the produced transcript file.
     """
 
+    if output_dir is None:
+        output_dir = get_default_output_dir()
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     if input_type == "audio":
@@ -289,7 +313,7 @@ def transcribe_batch(
     sources: list[str],
     input_type: str,
     language: str,
-    output_dir: str,
+    output_dir: str | None = None,
     model: str,
     progress_callback=None,
 ) -> list[str]:
@@ -300,6 +324,8 @@ def transcribe_batch(
     entire batch.
     """
 
+    if output_dir is None:
+        output_dir = get_default_output_dir()
     transcripts: list[str] = []
     total = len(sources) or 1
     for index, src in enumerate(sources, start=1):
@@ -364,14 +390,15 @@ def process_media(
     source: str,
     input_type: str,
     language: str,
-    output_dir: str,
+    output_dir: str | None,
     model: str,
     gpt_model: str,
     prompt: str,
     progress_callback=None,
 ) -> str:
     """Backward compatible helper that runs transcription then summary."""
-
+    if output_dir is None:
+        output_dir = get_default_output_dir()
     transcript_path = transcribe_media(
         source,
         input_type,

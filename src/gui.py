@@ -6,7 +6,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from config import get_default_output_dir, set_default_output_dir
+from config import get_default_output_dir, get_default_video_dir, set_default_output_dir
 from process import (
     summarize_transcript,
     transcribe_batch,
@@ -79,7 +79,7 @@ def start_download_video() -> None:
         try:
             paths = download_videos(
                 sources,
-                output_dir_var.get(),
+                get_default_video_dir(),
                 progress_callback=update_progress,
             )
             root.after(0, lambda: transcribe_status_var.set(f"Saved videos: {', '.join(paths)}"))
