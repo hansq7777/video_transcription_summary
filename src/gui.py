@@ -9,6 +9,7 @@ from types import ModuleType
 from tkinter import filedialog, messagebox, ttk
 import logging
 
+from browser_tabs import get_supported_chrome_tabs
 from config import get_default_output_dir, get_default_video_dir, set_default_output_dir
 
 # ``process`` and its heavy dependencies are imported lazily in the background so
@@ -65,14 +66,29 @@ def browse_audio_file() -> None:
         audio_file_var.set(f"{len(paths)} files selected")
 
 
+def load_browser_tabs() -> None:
+    """Populate URL list from open Chrome tabs."""
+    urls = get_supported_chrome_tabs()
+    if urls:
+        url_text.delete("1.0", tk.END)
+        for url in urls:
+            url_text.insert(tk.END, f"{url}\n")
+    else:
+        messagebox.showinfo(
+            "No tabs found", "No supported browser tabs were detected."
+        )
+
+
 def toggle_input_fields() -> None:
     """Enable fields based on the selected input type."""
     if input_type_var.get() == "url":
         url_text.config(state="normal")
+        load_tabs_button.config(state="normal")
         audio_entry.config(state="disabled")
         audio_browse.config(state="disabled")
     else:
         url_text.config(state="disabled")
+        load_tabs_button.config(state="disabled")
         audio_entry.config(state="readonly")
         audio_browse.config(state="normal")
 
@@ -306,7 +322,11 @@ tk.Radiobutton(
 
 tk.Label(transcribe_frame, text="Video URLs:").grid(row=1, column=0, sticky="ne")
 url_text = tk.Text(transcribe_frame, height=4, width=50)
-url_text.grid(row=1, column=1, padx=5, pady=2, columnspan=2, sticky="w")
+url_text.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+load_tabs_button = tk.Button(
+    transcribe_frame, text="Load Tabs", command=load_browser_tabs
+)
+load_tabs_button.grid(row=1, column=2, padx=5, pady=2)
 
 audio_file_var = tk.StringVar()
 tk.Label(transcribe_frame, text="Audio Files:").grid(row=2, column=0, sticky="e")
