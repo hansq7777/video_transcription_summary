@@ -122,18 +122,31 @@ def download_to_audio(
 
     if output_dir is None:
         output_dir = get_default_output_dir()
+    title_holder = {"title": url}
     if progress_callback:
-        progress_callback(0, "Downloading audio...")
+        progress_callback(0, f"{title_holder['title']} - Downloading audio...")
 
     def hook(d):
-        if progress_callback and d["status"] == "downloading":
-            total = d.get("total_bytes") or d.get("total_bytes_estimate")
-            downloaded = d.get("downloaded_bytes", 0)
-            if total:
-                progress = downloaded / total * 50
-                progress_callback(progress, "Downloading audio...")
-        elif progress_callback and d["status"] == "finished":
-            progress_callback(50, "Converting to audio...")
+        if progress_callback:
+            info = d.get("info_dict", {})
+            filename = d.get("filename")
+            title_holder["title"] = (
+                info.get("title")
+                or (Path(filename).stem if filename else title_holder["title"])
+            )
+            if d["status"] == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                downloaded = d.get("downloaded_bytes", 0)
+                if total:
+                    progress = downloaded / total * 50
+                    progress_callback(
+                        progress,
+                        f"{title_holder['title']} - Downloading audio...",
+                    )
+            elif d["status"] == "finished":
+                progress_callback(
+                    50, f"{title_holder['title']} - Converting to audio..."
+                )
 
     # Prefer downloading the best audio-only stream. If that's not available,
     # fall back to the lowest-quality video with the best audio to conserve
@@ -146,7 +159,7 @@ def download_to_audio(
     else:
         audio_path = convert_video_to_audio(media_path, output_dir)
     if progress_callback:
-        progress_callback(100, "Audio conversion completed")
+        progress_callback(100, f"{title_holder['title']} - Audio conversion completed")
     return audio_path
 
 
@@ -163,16 +176,30 @@ def download_videos(
     total = len(urls) or 1
     for index, url in enumerate(urls, start=1):
         base = (index - 1) * 100 / total
+        title_holder = {"title": url}
 
         def hook(d):
-            if progress_callback and d["status"] == "downloading":
-                total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate")
-                downloaded = d.get("downloaded_bytes", 0)
-                if total_bytes:
-                    progress = base + downloaded / total_bytes * (100 / total)
-                    progress_callback(progress, f"Downloading {index}/{total} videos...")
-            elif progress_callback and d["status"] == "finished":
-                progress_callback(base + 100 / total, f"Downloaded {index}/{total} videos")
+            if progress_callback:
+                info = d.get("info_dict", {})
+                filename = d.get("filename")
+                title_holder["title"] = (
+                    info.get("title")
+                    or (Path(filename).stem if filename else title_holder["title"])
+                )
+                if d["status"] == "downloading":
+                    total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate")
+                    downloaded = d.get("downloaded_bytes", 0)
+                    if total_bytes:
+                        progress = base + downloaded / total_bytes * (100 / total)
+                        progress_callback(
+                            progress,
+                            f"{index}/{total} {title_holder['title']} - Downloading",
+                        )
+                elif d["status"] == "finished":
+                    progress_callback(
+                        base + 100 / total,
+                        f"{index}/{total} {title_holder['title']} - Downloaded",
+                    )
 
         videos.append(download_video(url, output_dir, hook))
 
@@ -293,8 +320,9 @@ def transcribe_media(
     if input_type == "audio":
         audio_path = source
         start_progress = 0
+        name = Path(audio_path).stem
         if progress_callback:
-            progress_callback(0, "Transcribing...")
+            progress_callback(0, f"{name} - Transcribing...")
     elif input_type == "url":
         def cb(p: float, status: str | None = None) -> None:
             if progress_callback:
@@ -302,8 +330,9 @@ def transcribe_media(
 
         audio_path = download_to_audio(source, output_dir, progress_callback=cb)
         start_progress = 66
+        name = Path(audio_path).stem
         if progress_callback:
-            progress_callback(start_progress, "Transcribing...")
+            progress_callback(start_progress, f"{name} - Transcribing...")
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
 
@@ -326,7 +355,9 @@ def transcribe_media(
             transcripts.append(result.get("text", "").strip())
             if progress_callback:
                 progress = start_progress + (idx / total_segments) * (100 - start_progress)
-                progress_callback(progress, f"Transcribed {idx}/{total_segments} segments")
+                progress_callback(
+                    progress, f"{name} - Transcribed {idx}/{total_segments} segments"
+                )
     finally:
         if segments_dir is not None:
             shutil.rmtree(segments_dir)
@@ -337,7 +368,7 @@ def transcribe_media(
         f.write(transcript_text + "\n")
 
     if progress_callback:
-        progress_callback(100, "Transcription completed")
+        progress_callback(100, f"{name} - Transcription completed")
 
     return str(transcript_path)
 
@@ -396,8 +427,9 @@ def summarize_transcript(
     """Generate a ChatGPT summary for ``transcript_path``."""
 
     transcript_text = Path(transcript_path).read_text(encoding="utf-8")
+    name = Path(transcript_path).stem
     if progress_callback:
-        progress_callback(0, "Summarizing with ChatGPT...")
+        progress_callback(0, f"{name} - Summarizing with ChatGPT...")
     client = get_openai_client()
     try:
         completion = client.chat.completions.create(
@@ -414,11 +446,11 @@ def summarize_transcript(
         with summary_path.open("w", encoding="utf-8") as f:
             f.write(summary_text + "\n")
         if progress_callback:
-            progress_callback(100, "Summary completed")
+            progress_callback(100, f"{name} - Summary completed")
         return str(summary_path)
     except OpenAIError as exc:
         if progress_callback:
-            progress_callback(100, f"OpenAI API error: {exc}")
+            progress_callback(100, f"{name} - OpenAI API error: {exc}")
         raise
 
 
