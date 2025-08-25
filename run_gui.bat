@@ -16,10 +16,10 @@ REM Try launching with conda run and a named environment.
 where conda >NUL 2>&1
 IF %ERRORLEVEL%==0 (
     cd /d "%SCRIPT_DIR%"
-    CALL conda run -n %CONDA_ENV_NAME% pythonw src\gui.py
-    IF %ERRORLEVEL%==0 GOTO :EOF
-    CALL conda run -n %CONDA_ENV_NAME% python src\gui.py
-    IF %ERRORLEVEL%==0 GOTO :EOF
+    start "" conda run -n %CONDA_ENV_NAME% pythonw src\gui.py
+    IF %ERRORLEVEL%==0 GOTO :ExitSuccess
+    start "" conda run -n %CONDA_ENV_NAME% python src\gui.py
+    IF %ERRORLEVEL%==0 GOTO :ExitSuccess
 )
 
 REM If a local venv exists, activate it.
@@ -36,7 +36,11 @@ echo     python -m venv venv ^&^& pip install -r requirements.txt
 GOTO :PauseFail
 
 :CheckError
-IF %ERRORLEVEL%==0 GOTO :EOF
+IF %ERRORLEVEL%==0 GOTO :ExitSuccess
+GOTO :PauseFail
+
+:ExitSuccess
+exit
 
 :PauseFail
 echo.
@@ -47,8 +51,8 @@ exit /b %ERRORLEVEL%
 :RunWithPython
 where pythonw >NUL 2>&1
 IF %ERRORLEVEL%==0 (
-    pythonw %*
+    start "" pythonw %*
 ) ELSE (
-    python %*
+    start "" python %*
 )
 exit /b %ERRORLEVEL%
