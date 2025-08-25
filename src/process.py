@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import sys
+from datetime import datetime
 
 try:  # pragma: no cover - optional dependency
     import yt_dlp
@@ -29,6 +30,18 @@ from config import (
     get_default_output_dir,
     get_default_video_dir,
 )
+
+# Location for the persistent work log. It records downloaded media and
+# transcripts so users can review past actions across sessions.
+LOG_PATH = Path(__file__).resolve().parent.parent / "work.log"
+
+
+def _log(action: str, path: str) -> None:
+    """Append an entry describing ``action`` on ``path`` to ``LOG_PATH``."""
+
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    with LOG_PATH.open("a", encoding="utf-8") as f:
+        f.write(f"{timestamp}\t{action}\t{path}\n")
 
 # Lazily constructed OpenAI client.  ``None`` until ``get_openai_client`` is
 # first called from ``summarize_transcript``.
@@ -97,6 +110,7 @@ def download_video(
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         path = Path(ydl.prepare_filename(info))
+        _log("download_video", str(path))
         return str(path)
 
 
@@ -182,6 +196,7 @@ def download_to_audio(
         audio_path = convert_video_to_audio(media_path, output_dir)
     if progress_callback:
         progress_callback(100, f"{title_holder['title']} - Audio conversion completed")
+    _log("download_audio", audio_path)
     return audio_path
 
 
@@ -407,6 +422,7 @@ def transcribe_media(
     if progress_callback:
         progress_callback(100, f"{name} - Transcription completed")
 
+    _log("transcribe", str(transcript_path))
     return str(transcript_path)
 
 

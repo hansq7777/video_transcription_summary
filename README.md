@@ -2,6 +2,8 @@
 
 This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content. The GUI allows entering one or more video URLs or selecting multiple local audio files. Each source is transcribed in sequence and written to its own transcript file. By default, audio downloads and transcripts are stored under a `summaries` folder while full video downloads go to a `videos` folder; these directories are created automatically when needed.
 
+All downloads and transcription actions are logged to a `work.log` file in the project root so you can review past activity.
+
 ## Installation
 
 1. Install [ffmpeg](https://ffmpeg.org/) on your system.
