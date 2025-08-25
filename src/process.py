@@ -83,10 +83,10 @@ def download_video(
 
 
 def convert_video_to_audio(video_path: str, output_dir: str) -> str:
-    """Convert ``video_path`` to an MP3 file in ``output_dir``."""
+    """Convert ``video_path`` to an M4A file in ``output_dir`` and remove the source."""
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    audio_path = Path(output_dir) / f"{Path(video_path).stem}.mp3"
+    audio_path = Path(output_dir) / f"{Path(video_path).stem}.m4a"
     cmd = [
         "ffmpeg",
         "-y",
@@ -94,7 +94,7 @@ def convert_video_to_audio(video_path: str, output_dir: str) -> str:
         video_path,
         "-vn",
         "-acodec",
-        "libmp3lame",
+        "aac",
         str(audio_path),
     ]
     try:
@@ -108,6 +108,7 @@ def convert_video_to_audio(video_path: str, output_dir: str) -> str:
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffmpeg failed to convert video: {e.stderr}") from e
+    Path(video_path).unlink(missing_ok=True)
     return str(audio_path)
 
 
@@ -135,8 +136,12 @@ def download_to_audio(
     # fall back to the lowest-quality video with the best audio to conserve
     # bandwidth while preserving audio fidelity.
     fmt = "bestaudio/worstvideo+bestaudio/best"
-    video_path = download_video(url, output_dir, hook, format_spec=fmt)
-    audio_path = convert_video_to_audio(video_path, output_dir)
+    media_path = download_video(url, output_dir, hook, format_spec=fmt)
+    # If yt-dlp already produced an audio-only file in m4a format, reuse it.
+    if Path(media_path).suffix.lower() == ".m4a":
+        audio_path = media_path
+    else:
+        audio_path = convert_video_to_audio(media_path, output_dir)
     if progress_callback:
         progress_callback(100, "Audio conversion completed")
     return audio_path
@@ -230,7 +235,7 @@ def _split_audio(audio_path: str, segment_seconds: float) -> tuple[Path, list[Pa
     """Split ``audio_path`` into chunks of ``segment_seconds`` seconds."""
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="segments_"))
-    ext = Path(audio_path).suffix or ".mp3"
+    ext = Path(audio_path).suffix or ".m4a"
     segment_template = tmp_dir / f"segment_%03d{ext}"
     cmd = [
         "ffmpeg",
