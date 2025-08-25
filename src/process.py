@@ -26,14 +26,12 @@ LANGUAGE_CODES = {
 }
 
 
-def _download_audio_from_url(
-    url: str, output_dir: str, progress_hook=None
-) -> str:
-    """Download audio from a video URL and return the file path."""
+def download_video(url: str, output_dir: str, progress_hook=None) -> str:
+    """Download the full video from ``url`` and return the file path."""
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     ydl_opts = {
-        "format": "bestaudio/best",
+        "format": "bestvideo+bestaudio/best",
         "outtmpl": str(Path(output_dir) / "%(title)s.%(ext)s"),
         "noplaylist": True,
         "quiet": True,
@@ -46,6 +44,103 @@ def _download_audio_from_url(
         info = ydl.extract_info(url, download=True)
         path = Path(ydl.prepare_filename(info))
         return str(path)
+
+
+def convert_video_to_audio(video_path: str, output_dir: str) -> str:
+    """Convert ``video_path`` to an MP3 file in ``output_dir``."""
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    audio_path = Path(output_dir) / f"{Path(video_path).stem}.mp3"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        video_path,
+        "-vn",
+        "-acodec",
+        "libmp3lame",
+        str(audio_path),
+    ]
+    try:
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"ffmpeg failed to convert video: {e.stderr}") from e
+    return str(audio_path)
+
+
+def download_to_audio(url: str, output_dir: str, progress_callback=None) -> str:
+    """Download ``url`` and convert to audio, returning the audio path."""
+
+    if progress_callback:
+        progress_callback(0, "Downloading video...")
+
+    def hook(d):
+        if progress_callback and d["status"] == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate")
+            downloaded = d.get("downloaded_bytes", 0)
+            if total:
+                progress = downloaded / total * 50
+                progress_callback(progress, "Downloading video...")
+        elif progress_callback and d["status"] == "finished":
+            progress_callback(50, "Converting to audio...")
+
+    video_path = download_video(url, output_dir, hook)
+    audio_path = convert_video_to_audio(video_path, output_dir)
+    if progress_callback:
+        progress_callback(100, "Audio conversion completed")
+    return audio_path
+
+
+def download_videos(urls: list[str], output_dir: str, progress_callback=None) -> list[str]:
+    """Download multiple videos sequentially."""
+
+    videos: list[str] = []
+    total = len(urls) or 1
+    for index, url in enumerate(urls, start=1):
+        base = (index - 1) * 100 / total
+
+        def hook(d):
+            if progress_callback and d["status"] == "downloading":
+                total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate")
+                downloaded = d.get("downloaded_bytes", 0)
+                if total_bytes:
+                    progress = base + downloaded / total_bytes * (100 / total)
+                    progress_callback(progress, f"Downloading {index}/{total} videos...")
+            elif progress_callback and d["status"] == "finished":
+                progress_callback(base + 100 / total, f"Downloaded {index}/{total} videos")
+
+        videos.append(download_video(url, output_dir, hook))
+
+    if progress_callback:
+        progress_callback(100, "Video download completed")
+    return videos
+
+
+def convert_to_audio_batch(urls: list[str], output_dir: str, progress_callback=None) -> list[str]:
+    """Download videos and convert them to audio sequentially."""
+
+    audios: list[str] = []
+    total = len(urls) or 1
+    for index, url in enumerate(urls, start=1):
+        base = (index - 1) * 100 / total
+
+        def cb(p, status=None):
+            if progress_callback:
+                progress = base + p / total
+                progress_callback(progress, status)
+
+        audios.append(download_to_audio(url, output_dir, progress_callback=cb))
+
+    if progress_callback:
+        progress_callback(100, "Audio conversion completed")
+    return audios
 
 
 def _get_media_duration(path: str) -> float:
@@ -124,37 +219,30 @@ def transcribe_media(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     if input_type == "audio":
-        original_audio = source
+        audio_path = source
         start_progress = 0
         if progress_callback:
             progress_callback(0, "Transcribing...")
     elif input_type == "url":
-        start_progress = 50
+        def cb(p: float, status: str | None = None) -> None:
+            if progress_callback:
+                progress_callback(p * 0.66, status)
+
+        audio_path = download_to_audio(source, output_dir, progress_callback=cb)
+        start_progress = 66
         if progress_callback:
-            progress_callback(0, "Downloading audio...")
-
-        def hook(d):
-            if progress_callback and d["status"] == "downloading":
-                total = d.get("total_bytes") or d.get("total_bytes_estimate")
-                downloaded = d.get("downloaded_bytes", 0)
-                if total:
-                    progress = downloaded / total * start_progress
-                    progress_callback(progress, "Downloading audio...")
-            elif progress_callback and d["status"] == "finished":
-                progress_callback(start_progress, "Transcribing...")
-
-        original_audio = _download_audio_from_url(source, output_dir, hook)
+            progress_callback(start_progress, "Transcribing...")
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
 
-    duration = _get_media_duration(original_audio)
+    duration = _get_media_duration(audio_path)
     if duration <= 900:
         segments_dir = None
-        segments = [Path(original_audio)]
+        segments = [Path(audio_path)]
     else:
         segment_count = math.ceil(duration / 900)
         segment_time = duration / segment_count
-        segments_dir, segments = _split_audio(original_audio, segment_time)
+        segments_dir, segments = _split_audio(audio_path, segment_time)
 
     whisper_model = whisper.load_model(model)
     lang_code = LANGUAGE_CODES.get(language.lower(), None)
@@ -172,7 +260,7 @@ def transcribe_media(
             shutil.rmtree(segments_dir)
 
     transcript_text = "\n".join(transcripts).strip()
-    transcript_path = Path(output_dir) / f"{Path(original_audio).stem}.txt"
+    transcript_path = Path(output_dir) / f"{Path(audio_path).stem}.txt"
     with transcript_path.open("w", encoding="utf-8") as f:
         f.write(transcript_text + "\n")
 

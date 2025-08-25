@@ -7,7 +7,12 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from config import get_default_output_dir, set_default_output_dir
-from process import summarize_transcript, transcribe_batch
+from process import (
+    summarize_transcript,
+    transcribe_batch,
+    download_videos,
+    convert_to_audio_batch,
+)
 
 
 audio_files: list[str] = []
@@ -42,6 +47,93 @@ def toggle_input_fields() -> None:
         url_text.config(state="disabled")
         audio_entry.config(state="readonly")
         audio_browse.config(state="normal")
+
+
+def start_download_video() -> None:
+    """Download videos from the provided URLs."""
+    if input_type_var.get() != "url":
+        messagebox.showwarning("Invalid input", "Please enter video URLs to download")
+        return
+
+    sources = [
+        line.strip()
+        for line in url_text.get("1.0", tk.END).splitlines()
+        if line.strip()
+    ]
+    if not sources:
+        messagebox.showwarning("Missing source", "Please provide a URL.")
+        return
+
+    transcribe_progress_var.set(0)
+    transcribe_status_var.set("Starting...")
+
+    def update_progress(percent: float, status: str | None = None) -> None:
+        def _update() -> None:
+            transcribe_progress_var.set(percent)
+            if status is not None:
+                transcribe_status_var.set(status)
+
+        root.after(0, _update)
+
+    def task() -> None:
+        try:
+            paths = download_videos(
+                sources,
+                output_dir_var.get(),
+                progress_callback=update_progress,
+            )
+            root.after(0, lambda: transcribe_status_var.set(f"Saved videos: {', '.join(paths)}"))
+        except Exception as exc:  # pragma: no cover - GUI error path
+            error_message = str(exc)
+            root.after(0, lambda: transcribe_status_var.set("Error"))
+            root.after(0, lambda msg=error_message: messagebox.showerror("Error", msg))
+
+    threading.Thread(target=task, daemon=True).start()
+
+
+def start_audio_conversion() -> None:
+    """Download videos and convert them to audio files."""
+    if input_type_var.get() != "url":
+        messagebox.showwarning("Invalid input", "Please enter video URLs to convert")
+        return
+
+    sources = [
+        line.strip()
+        for line in url_text.get("1.0", tk.END).splitlines()
+        if line.strip()
+    ]
+    if not sources:
+        messagebox.showwarning("Missing source", "Please provide a URL.")
+        return
+
+    transcribe_progress_var.set(0)
+    transcribe_status_var.set("Starting...")
+
+    def update_progress(percent: float, status: str | None = None) -> None:
+        def _update() -> None:
+            transcribe_progress_var.set(percent)
+            if status is not None:
+                transcribe_status_var.set(status)
+
+        root.after(0, _update)
+
+    def task() -> None:
+        try:
+            paths = convert_to_audio_batch(
+                sources,
+                output_dir_var.get(),
+                progress_callback=update_progress,
+            )
+            audio_files.clear()
+            audio_files.extend(paths)
+            root.after(0, lambda: audio_file_var.set(f"{len(paths)} files saved"))
+            root.after(0, lambda: transcribe_status_var.set(f"Saved audio: {', '.join(paths)}"))
+        except Exception as exc:  # pragma: no cover - GUI error path
+            error_message = str(exc)
+            root.after(0, lambda: transcribe_status_var.set("Error"))
+            root.after(0, lambda msg=error_message: messagebox.showerror("Error", msg))
+
+    threading.Thread(target=task, daemon=True).start()
 
 
 def start_transcription() -> None:
@@ -198,8 +290,20 @@ tk.OptionMenu(transcribe_frame, whisper_model_var, *whisper_models).grid(
     row=5, column=1, padx=5, pady=2, sticky="w"
 )
 
-transcribe_button = tk.Button(transcribe_frame, text="Transcribe", command=start_transcription)
-transcribe_button.grid(row=6, column=1, pady=5)
+download_button = tk.Button(
+    transcribe_frame, text="Download Video", command=start_download_video
+)
+download_button.grid(row=6, column=0, pady=5)
+
+audio_button = tk.Button(
+    transcribe_frame, text="To Audio", command=start_audio_conversion
+)
+audio_button.grid(row=6, column=1, pady=5)
+
+transcribe_button = tk.Button(
+    transcribe_frame, text="Transcribe", command=start_transcription
+)
+transcribe_button.grid(row=6, column=2, pady=5)
 
 transcribe_progress_var = tk.DoubleVar(value=0)
 ttk.Progressbar(transcribe_frame, variable=transcribe_progress_var, maximum=100).grid(
