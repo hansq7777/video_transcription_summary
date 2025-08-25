@@ -127,7 +127,7 @@ def start_download_video() -> None:
                 get_default_video_dir(),
                 progress_callback=update_progress,
             )
-            root.after(0, lambda: transcribe_status_var.set(f"Saved videos: {', '.join(paths)}"))
+            root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} videos"))
         except Exception as exc:  # pragma: no cover - GUI error path
             logging.exception("Video download failed")
             error_message = (
@@ -180,7 +180,7 @@ def start_audio_conversion() -> None:
             audio_files.clear()
             audio_files.extend(paths)
             root.after(0, lambda: audio_file_var.set(f"{len(paths)} files saved"))
-            root.after(0, lambda: transcribe_status_var.set(f"Saved audio: {', '.join(paths)}"))
+            root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} audio files"))
         except Exception as exc:  # pragma: no cover - GUI error path
             logging.exception("Audio conversion failed")
             error_message = (
@@ -245,7 +245,7 @@ def start_transcription() -> None:
             combined = "\n\n".join(texts)
             root.after(0, lambda: transcript_text.delete("1.0", tk.END))
             root.after(0, lambda: transcript_text.insert(tk.END, combined))
-            root.after(0, lambda: transcribe_status_var.set(f"Saved transcripts: {', '.join(paths)}"))
+            root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} transcripts"))
         except Exception as exc:  # pragma: no cover - GUI error path
             error_message = str(exc)
             root.after(0, lambda: transcribe_status_var.set("Error"))
@@ -287,7 +287,7 @@ def start_summary() -> None:
             text = Path(summary_path).read_text(encoding="utf-8")
             root.after(0, lambda: summary_output.delete("1.0", tk.END))
             root.after(0, lambda: summary_output.insert(tk.END, text))
-            root.after(0, lambda: summary_status_var.set(f"Saved summary: {summary_path}"))
+            root.after(0, lambda: summary_status_var.set("Saved summary"))
         except Exception as exc:  # pragma: no cover - GUI error path
             error_message = str(exc)
             root.after(0, lambda: summary_status_var.set("Error"))

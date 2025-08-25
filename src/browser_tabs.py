@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import requests
+from urllib.parse import urlparse
 from yt_dlp.extractor import gen_extractors
 
 __all__ = [
@@ -36,6 +37,9 @@ def filter_supported_urls(urls: list[str]) -> list[str]:
     extractors = gen_extractors()
     supported = []
     for url in urls:
+        # Skip service worker scripts which are not downloadable media.
+        if urlparse(url).path.lower().endswith("service-worker.js"):
+            continue
         for extractor in extractors:
             if extractor.suitable(url) and extractor.IE_NAME != "generic":
                 supported.append(url)
