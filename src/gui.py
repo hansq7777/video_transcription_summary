@@ -7,12 +7,20 @@ import tkinter as tk
 from pathlib import Path
 from types import ModuleType
 from tkinter import filedialog, messagebox, ttk
+import logging
 
 from config import get_default_output_dir, get_default_video_dir, set_default_output_dir
 
 # ``process`` and its heavy dependencies are imported lazily in the background so
 # the GUI can appear quickly.
 process: ModuleType | None = None
+
+
+logging.basicConfig(
+    filename="app.log",
+    level=logging.ERROR,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
 
 
 def load_process_module() -> None:
@@ -105,9 +113,16 @@ def start_download_video() -> None:
             )
             root.after(0, lambda: transcribe_status_var.set(f"Saved videos: {', '.join(paths)}"))
         except Exception as exc:  # pragma: no cover - GUI error path
-            error_message = str(exc)
+            logging.exception("Video download failed")
+            error_message = (
+                f"{exc} - Unable to download the video. "
+                "The URL or save path might be invalid."
+            )
             root.after(0, lambda: transcribe_status_var.set("Error"))
-            root.after(0, lambda msg=error_message: messagebox.showerror("Error", msg))
+            root.after(
+                0,
+                lambda msg=error_message: messagebox.showerror("Download Failed", msg),
+            )
 
     threading.Thread(target=task, daemon=True).start()
 
@@ -151,9 +166,18 @@ def start_audio_conversion() -> None:
             root.after(0, lambda: audio_file_var.set(f"{len(paths)} files saved"))
             root.after(0, lambda: transcribe_status_var.set(f"Saved audio: {', '.join(paths)}"))
         except Exception as exc:  # pragma: no cover - GUI error path
-            error_message = str(exc)
+            logging.exception("Audio conversion failed")
+            error_message = (
+                f"{exc} - Unable to convert to audio. "
+                "The URL or save path might be invalid."
+            )
             root.after(0, lambda: transcribe_status_var.set("Error"))
-            root.after(0, lambda msg=error_message: messagebox.showerror("Error", msg))
+            root.after(
+                0,
+                lambda msg=error_message: messagebox.showerror(
+                    "Conversion Failed", msg
+                ),
+            )
 
     threading.Thread(target=task, daemon=True).start()
 
