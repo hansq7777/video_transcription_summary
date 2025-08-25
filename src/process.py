@@ -8,7 +8,10 @@ import subprocess
 import tempfile
 import sys
 
-import yt_dlp
+try:  # pragma: no cover - optional dependency
+    import yt_dlp
+except ImportError:  # pragma: no cover - dependency missing
+    yt_dlp = None  # type: ignore[assignment]
 import whisper
 
 # OpenAI is imported lazily to avoid heavy startup cost when the ChatGPT API
@@ -63,6 +66,11 @@ def download_video(
     callers to prefer audio-only downloads or other combinations supported by
     ``yt-dlp``.
     """
+
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for video downloads. Install it via 'pip install yt-dlp'."
+        )
 
     if output_dir is None:
         output_dir = get_default_video_dir()
@@ -120,6 +128,11 @@ def download_to_audio(
 ) -> str:
     """Download ``url`` and convert to audio, returning the audio path."""
 
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for audio downloads. Install it via 'pip install yt-dlp'."
+        )
+
     if output_dir is None:
         output_dir = get_default_output_dir()
     title_holder = {"title": url}
@@ -170,6 +183,11 @@ def download_videos(
 ) -> list[str]:
     """Download multiple videos sequentially."""
 
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for video downloads. Install it via 'pip install yt-dlp'."
+        )
+
     if output_dir is None:
         output_dir = get_default_video_dir()
     videos: list[str] = []
@@ -214,6 +232,11 @@ def convert_to_audio_batch(
     progress_callback=None,
 ) -> list[str]:
     """Download videos and convert them to audio sequentially."""
+
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for audio conversion. Install it via 'pip install yt-dlp'."
+        )
 
     if output_dir is None:
         output_dir = get_default_output_dir()
