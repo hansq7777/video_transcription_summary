@@ -26,12 +26,23 @@ LANGUAGE_CODES = {
 }
 
 
-def download_video(url: str, output_dir: str, progress_hook=None) -> str:
-    """Download the full video from ``url`` and return the file path."""
+def download_video(
+    url: str,
+    output_dir: str,
+    progress_hook=None,
+    format_spec: str = "bestvideo+bestaudio/best",
+) -> str:
+    """Download media from ``url`` using ``format_spec`` and return the file path.
+
+    The default ``format_spec`` selects the highest quality video combined with the
+    best available audio stream.  Supplying a different ``format_spec`` allows
+    callers to prefer audio-only downloads or other combinations supported by
+    ``yt-dlp``.
+    """
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
+        "format": format_spec,
         "outtmpl": str(Path(output_dir) / "%(title)s.%(ext)s"),
         "noplaylist": True,
         "quiet": True,
@@ -79,7 +90,7 @@ def download_to_audio(url: str, output_dir: str, progress_callback=None) -> str:
     """Download ``url`` and convert to audio, returning the audio path."""
 
     if progress_callback:
-        progress_callback(0, "Downloading video...")
+        progress_callback(0, "Downloading audio...")
 
     def hook(d):
         if progress_callback and d["status"] == "downloading":
@@ -87,11 +98,15 @@ def download_to_audio(url: str, output_dir: str, progress_callback=None) -> str:
             downloaded = d.get("downloaded_bytes", 0)
             if total:
                 progress = downloaded / total * 50
-                progress_callback(progress, "Downloading video...")
+                progress_callback(progress, "Downloading audio...")
         elif progress_callback and d["status"] == "finished":
             progress_callback(50, "Converting to audio...")
 
-    video_path = download_video(url, output_dir, hook)
+    # Prefer downloading the best audio-only stream. If that's not available,
+    # fall back to the lowest-quality video with the best audio to conserve
+    # bandwidth while preserving audio fidelity.
+    fmt = "bestaudio/worstvideo+bestaudio/best"
+    video_path = download_video(url, output_dir, hook, format_spec=fmt)
     audio_path = convert_video_to_audio(video_path, output_dir)
     if progress_callback:
         progress_callback(100, "Audio conversion completed")
