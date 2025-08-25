@@ -1,4 +1,4 @@
 yt-dlp
-openai-whisper
 openai>=1.0
+openai-whisper
 python-dotenv
