@@ -363,12 +363,6 @@ def transcribe_media(
     if output_dir is None:
         output_dir = get_default_output_dir()
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    if whisper is None:
-        raise RuntimeError(
-            "openai-whisper is required for transcription. Install it via 'pip install openai-whisper'."
-        )
-
     if input_type == "audio":
         audio_path = source
         start_progress = 0
@@ -387,6 +381,15 @@ def transcribe_media(
             progress_callback(start_progress, f"{name} - Transcribing...")
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
+    lang_code = LANGUAGE_CODES.get(language.lower(), None)
+
+    # The ``openai-whisper`` package is required for local transcription.
+    # Provide a clear error message if it is missing so users know how to
+    # enable the feature.
+    if whisper is None:
+        raise RuntimeError(
+            "openai-whisper is required for transcription. Install it via 'pip install openai-whisper'."
+        )
 
     duration = _get_media_duration(audio_path)
     if duration <= 900:
@@ -398,7 +401,6 @@ def transcribe_media(
         segments_dir, segments = _split_audio(audio_path, segment_time)
 
     whisper_model = whisper.load_model(model)
-    lang_code = LANGUAGE_CODES.get(language.lower(), None)
     transcripts: list[str] = []
     total_segments = len(segments) or 1
     try:

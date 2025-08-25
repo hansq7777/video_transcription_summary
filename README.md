@@ -1,6 +1,6 @@
 # Video Transcription Summary
 
-This project downloads videos, extracts audio, generates transcripts using OpenAI Whisper, and summarizes the content. The GUI allows entering one or more video URLs or selecting multiple local audio files. Each source is transcribed in sequence and written to its own transcript file. By default, audio downloads and transcripts are stored under a `summaries` folder while full video downloads go to a `videos` folder; these directories are created automatically when needed.
+This project downloads videos, extracts audio, generates transcripts and summarises the content. Transcription relies on local OpenAI Whisper models, so the ``openai-whisper`` package must be installed. The GUI allows entering one or more video URLs or selecting multiple local audio files. Each source is transcribed in sequence and written to its own transcript file. By default, audio downloads and transcripts are stored under a `summaries` folder while full video downloads go to a `videos` folder; these directories are created automatically when needed.
 
 All downloads and transcription actions are logged to a `work.log` file in the project root so you can review past activity.
 
@@ -13,7 +13,8 @@ All downloads and transcription actions are logged to a `work.log` file in the p
    ```
    The optional [yt-dlp](https://github.com/yt-dlp/yt-dlp) dependency enables the
    *Load Tabs* feature to detect supported video sites. If it is missing the
-   application will simply return no tabs.
+   application will simply return no tabs. The ``openai-whisper`` dependency is
+   required for transcription and is included in ``requirements.txt``.
 3. (Optional) Create a `.env` file to store configuration:
    ```env
    OPENAI_API_KEY=your_key_here
