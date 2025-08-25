@@ -9,8 +9,12 @@ import tempfile
 
 import yt_dlp
 import whisper
-import openai
-from openai import OpenAIError
+
+# OpenAI is imported lazily to avoid heavy startup cost when the ChatGPT API
+# is not used.  ``openai`` and ``OpenAIError`` are loaded within
+# :func:`get_openai_client`.
+openai = None
+OpenAIError = Exception
 
 from config import (
     get_openai_api_key,
@@ -18,8 +22,23 @@ from config import (
     get_default_video_dir,
 )
 
-# Initialise OpenAI client using the new 1.x API style
-client = openai.OpenAI(api_key=get_openai_api_key())
+# Lazily constructed OpenAI client.  ``None`` until ``get_openai_client`` is
+# first called from ``summarize_transcript``.
+client = None
+
+
+def get_openai_client():
+    """Return a cached OpenAI client, creating it on first use."""
+
+    global client, openai, OpenAIError
+    if client is None:
+        import openai as _openai
+        from openai import OpenAIError as _OpenAIError
+
+        openai = _openai
+        OpenAIError = _OpenAIError
+        client = openai.OpenAI(api_key=get_openai_api_key())
+    return client
 
 # Mapping of UI language names to whisper language codes
 LANGUAGE_CODES = {
@@ -363,6 +382,7 @@ def summarize_transcript(
     transcript_text = Path(transcript_path).read_text(encoding="utf-8")
     if progress_callback:
         progress_callback(0, "Summarizing with ChatGPT...")
+    client = get_openai_client()
     try:
         completion = client.chat.completions.create(
             model=gpt_model,
