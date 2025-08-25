@@ -16,6 +16,23 @@ from tkinter import messagebox
 ROOT = Path(__file__).resolve().parent
 sys.path.append(str(ROOT / "src"))
 
+# If a bundled virtual environment exists, expose its site-packages so that
+# running this script directly (e.g. via double-click on Windows) can still
+# find required third-party dependencies without needing the environment to be
+# activated first.
+if sys.platform == "win32":
+    venv_site = ROOT / "venv" / "Lib" / "site-packages"
+else:
+    venv_site = (
+        ROOT
+        / "venv"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+    )
+if venv_site.exists():
+    sys.path.insert(0, str(venv_site))
+
 
 def main() -> None:
     """Import the GUI module and start the Tkinter event loop."""
