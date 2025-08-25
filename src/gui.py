@@ -1,18 +1,38 @@
 """Tkinter GUI for transcribing audio and generating summaries."""
 from __future__ import annotations
 
+import importlib
 import threading
 import tkinter as tk
 from pathlib import Path
+from types import ModuleType
 from tkinter import filedialog, messagebox, ttk
 
 from config import get_default_output_dir, get_default_video_dir, set_default_output_dir
-from process import (
-    summarize_transcript,
-    transcribe_batch,
-    download_videos,
-    convert_to_audio_batch,
-)
+
+# ``process`` and its heavy dependencies are imported lazily in the background so
+# the GUI can appear quickly.
+process: ModuleType | None = None
+
+
+def load_process_module() -> None:
+    """Import the heavy ``process`` module in a background thread."""
+
+    global process
+    try:
+        process = importlib.import_module("process")
+    except Exception as exc:  # pragma: no cover - import error path
+        print(f"Failed to load dependencies: {exc}")
+
+
+def ensure_process_loaded() -> ModuleType:
+    """Ensure the ``process`` module is available and return it."""
+
+    global process
+    if process is None:
+        load_process_module()
+    assert process is not None  # for type checkers
+    return process
 
 
 audio_files: list[str] = []
@@ -77,7 +97,8 @@ def start_download_video() -> None:
 
     def task() -> None:
         try:
-            paths = download_videos(
+            module = ensure_process_loaded()
+            paths = module.download_videos(
                 sources,
                 get_default_video_dir(),
                 progress_callback=update_progress,
@@ -119,7 +140,8 @@ def start_audio_conversion() -> None:
 
     def task() -> None:
         try:
-            paths = convert_to_audio_batch(
+            module = ensure_process_loaded()
+            paths = module.convert_to_audio_batch(
                 sources,
                 output_dir_var.get(),
                 progress_callback=update_progress,
@@ -166,7 +188,8 @@ def start_transcription() -> None:
 
     def task() -> None:
         try:
-            paths = transcribe_batch(
+            module = ensure_process_loaded()
+            paths = module.transcribe_batch(
                 sources,
                 input_type_var.get(),
                 language_var.get(),
@@ -214,7 +237,8 @@ def start_summary() -> None:
 
     def task() -> None:
         try:
-            summary_path = summarize_transcript(
+            module = ensure_process_loaded()
+            summary_path = module.summarize_transcript(
                 path,
                 gpt_model_var.get(),
                 prompt_var.get(),
@@ -355,6 +379,9 @@ tk.Label(summary_frame, textvariable=summary_status_var).grid(
 transcript_path_var = tk.StringVar(value="")
 
 toggle_input_fields()
+
+# Begin loading heavy dependencies after the UI is ready.
+threading.Thread(target=load_process_module, daemon=True).start()
 
 if __name__ == "__main__":
     root.mainloop()
