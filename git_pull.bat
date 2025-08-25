@@ -17,7 +17,7 @@ where conda >NUL 2>&1
 IF %ERRORLEVEL%==0 (
     cd /d "%SCRIPT_DIR%"
     CALL conda run -n %CONDA_ENV_NAME% git pull
-    IF %ERRORLEVEL%==0 GOTO :EOF
+    IF %ERRORLEVEL%==0 GOTO :End
 )
 
 REM If a local venv exists, activate it.
@@ -34,10 +34,15 @@ echo     python -m venv venv ^&^& pip install -r requirements.txt
 GOTO :PauseFail
 
 :CheckError
-IF %ERRORLEVEL%==0 GOTO :EOF
+IF %ERRORLEVEL%==0 GOTO :End
 
 :PauseFail
 echo.
 echo Git pull failed. See messages above.
-pause
+GOTO :End
+
+:End
+echo.
+echo Operation complete. Press any key to close this window...
+pause >nul
 exit /b %ERRORLEVEL%
