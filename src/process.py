@@ -6,6 +6,7 @@ import math
 import shutil
 import subprocess
 import tempfile
+import sys
 
 import yt_dlp
 import whisper
@@ -98,14 +99,16 @@ def convert_video_to_audio(video_path: str, output_dir: str) -> str:
         str(audio_path),
     ]
     try:
-        subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-        )
+        run_kwargs = {
+            "check": True,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.PIPE,
+            "text": True,
+            "encoding": "utf-8",
+        }
+        if sys.platform == "win32":  # Avoid console window on Windows
+            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        subprocess.run(cmd, **run_kwargs)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffmpeg failed to convert video: {e.stderr}") from e
     Path(video_path).unlink(missing_ok=True)
@@ -195,6 +198,8 @@ def convert_to_audio_batch(
         def cb(p, status=None):
             if progress_callback:
                 progress = base + p / total
+                if status:
+                    status = f"{index}/{total} {status}"
                 progress_callback(progress, status)
 
         audios.append(download_to_audio(url, output_dir, progress_callback=cb))
@@ -218,14 +223,16 @@ def _get_media_duration(path: str) -> float:
         path,
     ]
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-        )
+        run_kwargs = {
+            "check": True,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+            "encoding": "utf-8",
+        }
+        if sys.platform == "win32":  # Avoid console window on Windows
+            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        result = subprocess.run(cmd, **run_kwargs)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffprobe failed to get duration: {e.stderr}") from e
     return float(result.stdout.strip())
@@ -250,14 +257,16 @@ def _split_audio(audio_path: str, segment_seconds: float) -> tuple[Path, list[Pa
         str(segment_template),
     ]
     try:
-        subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-        )
+        run_kwargs = {
+            "check": True,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.PIPE,
+            "text": True,
+            "encoding": "utf-8",
+        }
+        if sys.platform == "win32":  # Avoid console window on Windows
+            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        subprocess.run(cmd, **run_kwargs)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffmpeg failed to split audio: {e.stderr}") from e
     segments = sorted(tmp_dir.glob(f"segment_*{ext}"))
@@ -358,6 +367,8 @@ def transcribe_batch(
         def cb(p: float, status: str | None = None) -> None:
             if progress_callback:
                 overall = base + p / total
+                if status:
+                    status = f"{index}/{total} {status}"
                 progress_callback(overall, status)
 
         path = transcribe_media(
