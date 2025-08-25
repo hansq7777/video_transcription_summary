@@ -11,15 +11,17 @@ SET CONDA_ENV_NAME=VTS
 REM If already running inside a Conda environment, just execute the app.
 IF NOT "%CONDA_PREFIX%"=="" (
     cd /d "%SCRIPT_DIR%"
-    pythonw src\gui.py
-    exit /b 0
+    CALL :RunWithPython src\gui.py
+    exit /b %ERRORLEVEL%
 )
 
 REM Try launching with conda run and a named environment.
 where conda >NUL 2>&1
 IF %ERRORLEVEL%==0 (
     cd /d "%SCRIPT_DIR%"
-    conda run -n %CONDA_ENV_NAME% pythonw src\gui.py
+    CALL conda run -n %CONDA_ENV_NAME% pythonw src\gui.py
+    IF %ERRORLEVEL%==0 exit /b 0
+    CALL conda run -n %CONDA_ENV_NAME% python src\gui.py
     IF %ERRORLEVEL%==0 exit /b 0
 )
 
@@ -27,8 +29,8 @@ REM If a local venv exists, activate it.
 IF EXIST "%VENV_DIR%\Scripts\activate.bat" (
     CALL "%VENV_DIR%\Scripts\activate.bat"
     cd /d "%SCRIPT_DIR%"
-    pythonw src\gui.py
-    exit /b 0
+    CALL :RunWithPython src\gui.py
+    exit /b %ERRORLEVEL%
 )
 
 echo No Python environment found.
@@ -36,3 +38,12 @@ echo Install dependencies with Conda (conda create -n %CONDA_ENV_NAME% -f requir
 echo     python -m venv venv ^&^& pip install -r requirements.txt
 pause
 exit /b 1
+
+:RunWithPython
+where pythonw >NUL 2>&1
+IF %ERRORLEVEL%==0 (
+    pythonw %*
+) ELSE (
+    python %*
+)
+exit /b %ERRORLEVEL%
