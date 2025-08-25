@@ -3,3 +3,4 @@ openai-whisper
 openai>=1.0
 python-dotenv
 pyinstaller
+requests
