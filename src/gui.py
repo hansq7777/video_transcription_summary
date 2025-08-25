@@ -68,7 +68,11 @@ def browse_audio_file() -> None:
 
 def load_browser_tabs() -> None:
     """Populate URL list from open Chrome tabs."""
-    urls = get_supported_chrome_tabs()
+    try:
+        urls = get_supported_chrome_tabs()
+    except Exception as exc:  # pragma: no cover - GUI error path
+        messagebox.showerror("Error", str(exc))
+        return
     if urls:
         url_text.delete("1.0", tk.END)
         for url in urls:
