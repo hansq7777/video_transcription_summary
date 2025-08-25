@@ -31,6 +31,8 @@ The `run_gui.bat` script can launch the GUI without manually activating an envir
 
 Double-click `run_gui.bat` in the project folder. The script runs `src\gui.py` with `pythonw`, so no console window appears. If no suitable environment is found, it displays instructions for creating one.
 
+Alternatively, on Windows you can double-click `start_gui.pyw` to launch the application directly. The `.pyw` extension ensures the GUI runs via `pythonw`, which suppresses the separate Command Prompt window and leaves only the GUI on the task bar.
+
 ## Building an Executable
 
 Create a standalone Windows build using [PyInstaller](https://pyinstaller.org/):
