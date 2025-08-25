@@ -170,8 +170,8 @@ def start_transcription() -> None:
                 sources,
                 input_type_var.get(),
                 language_var.get(),
-                output_dir_var.get(),
                 whisper_model_var.get(),
+                output_dir_var.get(),
                 progress_callback=update_progress,
             )
             transcript_path_var.set(paths[0] if paths else "")

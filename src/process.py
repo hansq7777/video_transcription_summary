@@ -313,8 +313,8 @@ def transcribe_batch(
     sources: list[str],
     input_type: str,
     language: str,
-    output_dir: str | None = None,
     model: str,
+    output_dir: str | None = None,
     progress_callback=None,
 ) -> list[str]:
     """Transcribe multiple ``sources`` sequentially.
