@@ -19,3 +19,12 @@ Audio shorter than 15 minutes is transcribed directly. Longer media is split int
    ```
    The application reads these values using [python-dotenv](https://github.com/theskumar/python-dotenv).
 
+
+## Windows Launcher
+
+After creating a virtual environment named `venv` and installing the project dependencies, you can start the GUI without using the command line:
+
+1. Double-click `run_gui.bat` in the project folder.
+2. The script activates `venv` and launches `src\gui.py` using `pythonw`, so no console window appears.
+3. If `venv` is missing, the script displays instructions for creating it.
+
