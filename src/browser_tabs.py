@@ -41,7 +41,7 @@ def filter_supported_urls(urls: list[str]) -> list[str]:
             "yt_dlp is required to detect supported URLs. Install it via 'pip install yt-dlp'.",
             RuntimeWarning,
         )
-        return []
+        return urls
 
     extractors = gen_extractors()
     supported = []
@@ -57,5 +57,9 @@ def filter_supported_urls(urls: list[str]) -> list[str]:
 
 
 def get_supported_chrome_tabs(port: int = 9222) -> list[str]:
-    """Return URLs of open Chrome tabs supported by ``yt_dlp``."""
+    """Return URLs of open Chrome tabs supported by ``yt_dlp``.
+
+    If ``yt_dlp`` is not installed, all URLs from open tabs are returned
+    without filtering.
+    """
     return filter_supported_urls(get_chrome_tabs(port))

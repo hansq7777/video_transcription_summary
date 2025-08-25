@@ -1,6 +1,6 @@
 @echo off
 python -m pip install -r "%~dp0requirements.txt"
 echo.
-echo 操作完成，按任意键关闭窗口...
+echo Installation complete. Press any key to close the window...
 pause >nul
 exit /b %ERRORLEVEL%
