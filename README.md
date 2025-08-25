@@ -22,9 +22,10 @@ Audio shorter than 15 minutes is transcribed directly. Longer media is split int
 
 ## Windows Launcher
 
-After creating a virtual environment named `venv` and installing the project dependencies, you can start the GUI without using the command line:
+The `run_gui.bat` script can launch the GUI without manually activating an environment:
 
-1. Double-click `run_gui.bat` in the project folder.
-2. The script activates `venv` and launches `src\gui.py` using `pythonw`, so no console window appears.
-3. If `venv` is missing, the script displays instructions for creating it.
+1. If a Conda environment is already active, it is used.
+2. Otherwise the script tries to run via a Conda environment named `VTS` (change `CONDA_ENV_NAME` in the script to use a different name).
+3. If Conda is unavailable, it falls back to a local `venv` if one exists.
 
+Double-click `run_gui.bat` in the project folder. The script runs `src\gui.py` with `pythonw`, so no console window appears. If no suitable environment is found, it displays instructions for creating one.
