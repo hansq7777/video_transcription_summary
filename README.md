@@ -29,13 +29,14 @@ Launch the GUI:
 
 ```bash
 run_gui.bat              # Windows: auto-detects venv or Conda
-python start_gui.pyw     # Windows: run directly or double-click
+python start_gui.py      # Windows: run directly or double-click
 python src/gui.py        # any platform
 ```
 
-The ``start_gui.pyw`` launcher hides the console window. When executed by
-double‑clicking, it attempts to load dependencies from a local ``venv`` folder
-if present. If packages are missing, use ``run_gui.bat`` or install the
-requirements into your default Python environment.
+The ``start_gui.py`` launcher hides the console window when executed with
+``pythonw`` (as done in ``run_gui.bat``). When run directly, it attempts to load
+dependencies from a local ``venv`` folder if present. If packages are missing,
+use ``run_gui.bat`` or install the requirements into your default Python
+environment.
 
 Enter video URLs or select audio files, then run the desired actions to download, transcribe and summarise content.
