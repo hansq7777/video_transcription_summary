@@ -114,6 +114,7 @@ def start_download_video() -> None:
 
     transcribe_progress_var.set(0)
     transcribe_status_var.set("Starting...")
+    skip_count_var.set("Skipped: 0")
 
     def update_progress(percent: float, status: str | None = None) -> None:
         def _update() -> None:
@@ -126,12 +127,13 @@ def start_download_video() -> None:
     def task() -> None:
         try:
             module = ensure_process_loaded()
-            paths = module.download_videos(
+            paths, skipped = module.download_videos(
                 sources,
                 get_default_video_dir(),
                 progress_callback=update_progress,
             )
             root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} videos"))
+            root.after(0, lambda: skip_count_var.set(f"Skipped: {skipped}"))
         except Exception as exc:  # pragma: no cover - GUI error path
             logging.exception("Video download failed")
             error_message = (
@@ -164,6 +166,7 @@ def start_audio_conversion() -> None:
 
     transcribe_progress_var.set(0)
     transcribe_status_var.set("Starting...")
+    skip_count_var.set("Skipped: 0")
 
     def update_progress(percent: float, status: str | None = None) -> None:
         def _update() -> None:
@@ -176,7 +179,7 @@ def start_audio_conversion() -> None:
     def task() -> None:
         try:
             module = ensure_process_loaded()
-            paths = module.convert_to_audio_batch(
+            paths, skipped = module.convert_to_audio_batch(
                 sources,
                 output_dir_var.get(),
                 progress_callback=update_progress,
@@ -185,6 +188,7 @@ def start_audio_conversion() -> None:
             audio_files.extend(paths)
             root.after(0, lambda: audio_file_var.set(f"{len(paths)} files saved"))
             root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} audio files"))
+            root.after(0, lambda: skip_count_var.set(f"Skipped: {skipped}"))
         except Exception as exc:  # pragma: no cover - GUI error path
             logging.exception("Audio conversion failed")
             error_message = (
@@ -221,6 +225,7 @@ def start_transcription() -> None:
 
     transcribe_progress_var.set(0)
     transcribe_status_var.set("Starting...")
+    skip_count_var.set("Skipped: 0")
 
     def update_progress(percent: float, status: str | None = None) -> None:
         def _update() -> None:
@@ -233,7 +238,7 @@ def start_transcription() -> None:
     def task() -> None:
         try:
             module = ensure_process_loaded()
-            paths = module.transcribe_batch(
+            paths, skipped = module.transcribe_batch(
                 sources,
                 input_type_var.get(),
                 language_var.get(),
@@ -250,6 +255,7 @@ def start_transcription() -> None:
             root.after(0, lambda: transcript_text.delete("1.0", tk.END))
             root.after(0, lambda: transcript_text.insert(tk.END, combined))
             root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} transcripts"))
+            root.after(0, lambda: skip_count_var.set(f"Skipped: {skipped}"))
         except Exception as exc:  # pragma: no cover - GUI error path
             error_message = str(exc)
             root.after(0, lambda: transcribe_status_var.set("Error"))
@@ -385,6 +391,11 @@ ttk.Progressbar(transcribe_frame, variable=transcribe_progress_var, maximum=100)
 transcribe_status_var = tk.StringVar(value="")
 tk.Label(transcribe_frame, textvariable=transcribe_status_var).grid(
     row=8, column=0, columnspan=3
+)
+
+skip_count_var = tk.StringVar(value="Skipped: 0")
+tk.Label(transcribe_frame, textvariable=skip_count_var).grid(
+    row=9, column=0, columnspan=3
 )
 
 # ---------------- Summary section ----------------
