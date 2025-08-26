@@ -48,6 +48,32 @@ def _log(action: str, path: str) -> None:
 client = None
 
 
+def _run_command(
+    cmd: list[str], *, capture_output: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """Run ``cmd`` hiding any console window on Windows.
+
+    ``capture_output`` controls whether stdout is captured. stderr is always
+    captured so any errors can be surfaced to the caller.
+    """
+
+    run_kwargs: dict[str, object] = {
+        "check": True,
+        "stdin": subprocess.DEVNULL,
+        "start_new_session": True,
+        "text": True,
+        "encoding": "utf-8",
+        "stderr": subprocess.PIPE,
+        "stdout": subprocess.PIPE if capture_output else subprocess.DEVNULL,
+    }
+    if sys.platform == "win32":  # Avoid console window on Windows
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        run_kwargs["startupinfo"] = startupinfo
+        run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return subprocess.run(cmd, **run_kwargs)
+
+
 def get_openai_client():
     """Return a cached OpenAI client, creating it on first use."""
 
@@ -150,18 +176,7 @@ def convert_video_to_audio(video_path: str, output_dir: str) -> str:
         str(audio_path),
     ]
     try:
-        run_kwargs = {
-            "check": True,
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.PIPE,
-            "text": True,
-            "encoding": "utf-8",
-            "stdin": subprocess.DEVNULL,
-            "start_new_session": True,
-        }
-        if sys.platform == "win32":  # Avoid console window on Windows
-            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-        subprocess.run(cmd, **run_kwargs)
+        _run_command(cmd)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffmpeg failed to convert video: {e.stderr}") from e
     Path(video_path).unlink(missing_ok=True)
@@ -412,18 +427,7 @@ def _get_media_duration(path: str) -> float:
         path,
     ]
     try:
-        run_kwargs = {
-            "check": True,
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
-            "text": True,
-            "encoding": "utf-8",
-            "stdin": subprocess.DEVNULL,
-            "start_new_session": True,
-        }
-        if sys.platform == "win32":  # Avoid console window on Windows
-            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-        result = subprocess.run(cmd, **run_kwargs)
+        result = _run_command(cmd, capture_output=True)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffprobe failed to get duration: {e.stderr}") from e
     return float(result.stdout.strip())
@@ -448,18 +452,7 @@ def _split_audio(audio_path: str, segment_seconds: float) -> tuple[Path, list[Pa
         str(segment_template),
     ]
     try:
-        run_kwargs = {
-            "check": True,
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.PIPE,
-            "text": True,
-            "encoding": "utf-8",
-            "stdin": subprocess.DEVNULL,
-            "start_new_session": True,
-        }
-        if sys.platform == "win32":  # Avoid console window on Windows
-            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-        subprocess.run(cmd, **run_kwargs)
+        _run_command(cmd)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"ffmpeg failed to split audio: {e.stderr}") from e
     segments = sorted(tmp_dir.glob(f"segment_*{ext}"))
