@@ -8,7 +8,7 @@ SET CONDA_ENV_NAME=VTS
 REM Try running inside an active Conda environment.
 IF NOT "%CONDA_PREFIX%"=="" (
     cd /d "%SCRIPT_DIR%"
-    CALL :RunWithPython start_gui.pyw
+    CALL :RunWithPython start_gui.py
     GOTO :CheckError
 )
 
@@ -16,9 +16,9 @@ REM Try launching with conda run and a named environment.
 where conda >NUL 2>&1
 IF %ERRORLEVEL%==0 (
     cd /d "%SCRIPT_DIR%"
-    start "" conda run -n %CONDA_ENV_NAME% pythonw start_gui.pyw
+    start "" conda run -n %CONDA_ENV_NAME% pythonw start_gui.py
     IF %ERRORLEVEL%==0 GOTO :ExitSuccess
-    start "" conda run -n %CONDA_ENV_NAME% python start_gui.pyw
+    start "" conda run -n %CONDA_ENV_NAME% python start_gui.py
     IF %ERRORLEVEL%==0 GOTO :ExitSuccess
 )
 
@@ -26,7 +26,7 @@ REM If a local venv exists, activate it.
 IF EXIST "%VENV_DIR%\Scripts\activate.bat" (
     CALL "%VENV_DIR%\Scripts\activate.bat"
     cd /d "%SCRIPT_DIR%"
-    CALL :RunWithPython start_gui.pyw
+    CALL :RunWithPython start_gui.py
     GOTO :CheckError
 )
 
