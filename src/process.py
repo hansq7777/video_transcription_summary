@@ -75,6 +75,26 @@ LANGUAGE_CODES = {
 }
 
 
+def _get_filename_from_url(url: str, format_spec: str) -> Path:
+    """Return the sanitised filename for ``url`` using ``format_spec`` without downloading."""
+
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for media downloads. Install it via 'pip install yt-dlp'."
+        )
+
+    ydl_opts = {
+        "format": format_spec,
+        "quiet": True,
+        "no_warnings": True,
+        "outtmpl": "%(title)s.%(ext)s",
+        "noplaylist": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        return Path(ydl.prepare_filename(info))
+
+
 def download_video(
     url: str,
     output_dir: str | None = None,
@@ -136,6 +156,8 @@ def convert_video_to_audio(video_path: str, output_dir: str) -> str:
             "stderr": subprocess.PIPE,
             "text": True,
             "encoding": "utf-8",
+            "stdin": subprocess.DEVNULL,
+            "start_new_session": True,
         }
         if sys.platform == "win32":  # Avoid console window on Windows
             run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
@@ -204,8 +226,8 @@ def download_videos(
     urls: list[str],
     output_dir: str | None = None,
     progress_callback=None,
-) -> list[str]:
-    """Download multiple videos sequentially."""
+) -> tuple[list[str], int]:
+    """Download multiple videos sequentially, skipping existing files."""
 
     if yt_dlp is None:
         raise RuntimeError(
@@ -214,11 +236,27 @@ def download_videos(
 
     if output_dir is None:
         output_dir = get_default_video_dir()
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    for url in urls:
+        filename = _get_filename_from_url(url, "bestvideo+bestaudio/best")
+        target = Path(output_dir) / filename.name
+        entries.append((url, filename.stem, target, target.exists()))
+
     videos: list[str] = []
-    total = len(urls) or 1
-    for index, url in enumerate(urls, start=1):
+    skipped = 0
+    total = len(entries) or 1
+    for index, (url, title, target, exists) in enumerate(entries, start=1):
         base = (index - 1) * 100 / total
-        title_holder = {"title": url}
+        if exists:
+            skipped += 1
+            videos.append(str(target))
+            if progress_callback:
+                progress_callback(base + 100 / total, f"{index}/{total} {title} - Skipped")
+            continue
+
+        title_holder = {"title": title}
 
         def hook(d):
             if progress_callback:
@@ -247,15 +285,15 @@ def download_videos(
 
     if progress_callback:
         progress_callback(100, "Video download completed")
-    return videos
+    return videos, skipped
 
 
 def convert_to_audio_batch(
     urls: list[str],
     output_dir: str | None = None,
     progress_callback=None,
-) -> list[str]:
-    """Download videos and convert them to audio sequentially."""
+) -> tuple[list[str], int]:
+    """Download videos and convert them to audio sequentially, skipping existing files."""
 
     if yt_dlp is None:
         raise RuntimeError(
@@ -264,10 +302,25 @@ def convert_to_audio_batch(
 
     if output_dir is None:
         output_dir = get_default_output_dir()
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    for url in urls:
+        filename = _get_filename_from_url(url, "bestaudio/worstvideo+bestaudio/best")
+        audio_path = Path(output_dir) / f"{filename.stem}.m4a"
+        entries.append((url, filename.stem, audio_path, audio_path.exists()))
+
     audios: list[str] = []
-    total = len(urls) or 1
-    for index, url in enumerate(urls, start=1):
+    skipped = 0
+    total = len(entries) or 1
+    for index, (url, title, audio_path, exists) in enumerate(entries, start=1):
         base = (index - 1) * 100 / total
+        if exists:
+            skipped += 1
+            audios.append(str(audio_path))
+            if progress_callback:
+                progress_callback(base + 100 / total, f"{index}/{total} {title} - Skipped")
+            continue
 
         def cb(p, status=None):
             if progress_callback:
@@ -280,7 +333,7 @@ def convert_to_audio_batch(
 
     if progress_callback:
         progress_callback(100, "Audio conversion completed")
-    return audios
+    return audios, skipped
 
 
 def _get_media_duration(path: str) -> float:
@@ -303,6 +356,8 @@ def _get_media_duration(path: str) -> float:
             "stderr": subprocess.PIPE,
             "text": True,
             "encoding": "utf-8",
+            "stdin": subprocess.DEVNULL,
+            "start_new_session": True,
         }
         if sys.platform == "win32":  # Avoid console window on Windows
             run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
@@ -337,6 +392,8 @@ def _split_audio(audio_path: str, segment_seconds: float) -> tuple[Path, list[Pa
             "stderr": subprocess.PIPE,
             "text": True,
             "encoding": "utf-8",
+            "stdin": subprocess.DEVNULL,
+            "start_new_session": True,
         }
         if sys.platform == "win32":  # Avoid console window on Windows
             run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
@@ -435,20 +492,35 @@ def transcribe_batch(
     model: str,
     output_dir: str | None = None,
     progress_callback=None,
-) -> list[str]:
-    """Transcribe multiple ``sources`` sequentially.
-
-    Each source is processed in order and the resulting transcript paths are
-    returned as a list. Progress is reported as an overall percentage across the
-    entire batch.
-    """
+) -> tuple[list[str], int]:
+    """Transcribe multiple ``sources`` sequentially, skipping existing transcripts."""
 
     if output_dir is None:
         output_dir = get_default_output_dir()
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    for src in sources:
+        if input_type == "url":
+            filename = _get_filename_from_url(src, "bestaudio/worstvideo+bestaudio/best")
+            transcript_path = Path(output_dir) / f"{filename.stem}.txt"
+            title = filename.stem
+        else:
+            transcript_path = Path(output_dir) / f"{Path(src).stem}.txt"
+            title = Path(src).stem
+        entries.append((src, title, transcript_path, transcript_path.exists()))
+
     transcripts: list[str] = []
-    total = len(sources) or 1
-    for index, src in enumerate(sources, start=1):
+    skipped = 0
+    total = len(entries) or 1
+    for index, (src, title, transcript_path, exists) in enumerate(entries, start=1):
         base = (index - 1) * 100 / total
+        if exists:
+            skipped += 1
+            transcripts.append(str(transcript_path))
+            if progress_callback:
+                progress_callback(base + 100 / total, f"{index}/{total} {title} - Skipped")
+            continue
 
         def cb(p: float, status: str | None = None) -> None:
             if progress_callback:
@@ -470,7 +542,7 @@ def transcribe_batch(
     if progress_callback:
         progress_callback(100, "Transcription completed")
 
-    return transcripts
+    return transcripts, skipped
 
 
 def summarize_transcript(
