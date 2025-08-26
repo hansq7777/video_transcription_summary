@@ -222,12 +222,14 @@ def download_to_audio(
     return audio_path
 
 
-def download_videos(
-    urls: list[str],
-    output_dir: str | None = None,
-    progress_callback=None,
-) -> tuple[list[str], int]:
-    """Download multiple videos sequentially, skipping existing files."""
+def prepare_video_entries(
+    urls: list[str], output_dir: str | None = None
+) -> list[tuple[str, str, Path, bool]]:
+    """Return planned download entries for ``urls``.
+
+    Each entry is a tuple of ``(url, title, target_path, exists)`` where
+    ``exists`` indicates whether the target file already exists.
+    """
 
     if yt_dlp is None:
         raise RuntimeError(
@@ -238,11 +240,77 @@ def download_videos(
         output_dir = get_default_video_dir()
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    entries = []
+    entries: list[tuple[str, str, Path, bool]] = []
     for url in urls:
         filename = _get_filename_from_url(url, "bestvideo+bestaudio/best")
         target = Path(output_dir) / filename.name
         entries.append((url, filename.stem, target, target.exists()))
+    return entries
+
+
+def prepare_audio_entries(
+    urls: list[str], output_dir: str | None = None
+) -> list[tuple[str, str, Path, bool]]:
+    """Return planned audio conversion entries for ``urls``."""
+
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for audio conversion. Install it via 'pip install yt-dlp'."
+        )
+
+    if output_dir is None:
+        output_dir = get_default_output_dir()
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    entries: list[tuple[str, str, Path, bool]] = []
+    for url in urls:
+        filename = _get_filename_from_url(url, "bestaudio/worstvideo+bestaudio/best")
+        audio_path = Path(output_dir) / f"{filename.stem}.m4a"
+        entries.append((url, filename.stem, audio_path, audio_path.exists()))
+    return entries
+
+
+def prepare_transcription_entries(
+    sources: list[str],
+    input_type: str,
+    output_dir: str | None = None,
+) -> list[tuple[str, str, Path, bool]]:
+    """Return planned transcription entries for ``sources``."""
+
+    if output_dir is None:
+        output_dir = get_default_output_dir()
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    entries: list[tuple[str, str, Path, bool]] = []
+    for src in sources:
+        if input_type == "url":
+            filename = _get_filename_from_url(
+                src, "bestaudio/worstvideo+bestaudio/best"
+            )
+            transcript_path = Path(output_dir) / f"{filename.stem}.txt"
+            title = filename.stem
+        else:
+            transcript_path = Path(output_dir) / f"{Path(src).stem}.txt"
+            title = Path(src).stem
+        entries.append((src, title, transcript_path, transcript_path.exists()))
+    return entries
+
+
+def download_videos(
+    urls: list[str],
+    output_dir: str | None = None,
+    progress_callback=None,
+    entries: list[tuple[str, str, Path, bool]] | None = None,
+) -> tuple[list[str], int]:
+    """Download multiple videos sequentially, skipping existing files."""
+
+    if yt_dlp is None:
+        raise RuntimeError(
+            "yt_dlp is required for video downloads. Install it via 'pip install yt-dlp'."
+        )
+
+    if entries is None:
+        entries = prepare_video_entries(urls, output_dir)
 
     videos: list[str] = []
     skipped = 0
@@ -292,6 +360,7 @@ def convert_to_audio_batch(
     urls: list[str],
     output_dir: str | None = None,
     progress_callback=None,
+    entries: list[tuple[str, str, Path, bool]] | None = None,
 ) -> tuple[list[str], int]:
     """Download videos and convert them to audio sequentially, skipping existing files."""
 
@@ -300,15 +369,8 @@ def convert_to_audio_batch(
             "yt_dlp is required for audio conversion. Install it via 'pip install yt-dlp'."
         )
 
-    if output_dir is None:
-        output_dir = get_default_output_dir()
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    entries = []
-    for url in urls:
-        filename = _get_filename_from_url(url, "bestaudio/worstvideo+bestaudio/best")
-        audio_path = Path(output_dir) / f"{filename.stem}.m4a"
-        entries.append((url, filename.stem, audio_path, audio_path.exists()))
+    if entries is None:
+        entries = prepare_audio_entries(urls, output_dir)
 
     audios: list[str] = []
     skipped = 0
@@ -492,23 +554,12 @@ def transcribe_batch(
     model: str,
     output_dir: str | None = None,
     progress_callback=None,
+    entries: list[tuple[str, str, Path, bool]] | None = None,
 ) -> tuple[list[str], int]:
     """Transcribe multiple ``sources`` sequentially, skipping existing transcripts."""
 
-    if output_dir is None:
-        output_dir = get_default_output_dir()
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    entries = []
-    for src in sources:
-        if input_type == "url":
-            filename = _get_filename_from_url(src, "bestaudio/worstvideo+bestaudio/best")
-            transcript_path = Path(output_dir) / f"{filename.stem}.txt"
-            title = filename.stem
-        else:
-            transcript_path = Path(output_dir) / f"{Path(src).stem}.txt"
-            title = Path(src).stem
-        entries.append((src, title, transcript_path, transcript_path.exists()))
+    if entries is None:
+        entries = prepare_transcription_entries(sources, input_type, output_dir)
 
     transcripts: list[str] = []
     skipped = 0
