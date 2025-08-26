@@ -127,10 +127,18 @@ def start_download_video() -> None:
     def task() -> None:
         try:
             module = ensure_process_loaded()
+            entries = module.prepare_video_entries(
+                sources, get_default_video_dir()
+            )
+            skipped_initial = sum(1 for _, _, _, exists in entries if exists)
+            root.after(
+                0, lambda: skip_count_var.set(f"Skipped: {skipped_initial}")
+            )
             paths, skipped = module.download_videos(
                 sources,
                 get_default_video_dir(),
                 progress_callback=update_progress,
+                entries=entries,
             )
             root.after(0, lambda: transcribe_status_var.set(f"Saved {len(paths)} videos"))
             root.after(0, lambda: skip_count_var.set(f"Skipped: {skipped}"))
@@ -179,10 +187,18 @@ def start_audio_conversion() -> None:
     def task() -> None:
         try:
             module = ensure_process_loaded()
+            entries = module.prepare_audio_entries(
+                sources, output_dir_var.get()
+            )
+            skipped_initial = sum(1 for _, _, _, exists in entries if exists)
+            root.after(
+                0, lambda: skip_count_var.set(f"Skipped: {skipped_initial}")
+            )
             paths, skipped = module.convert_to_audio_batch(
                 sources,
                 output_dir_var.get(),
                 progress_callback=update_progress,
+                entries=entries,
             )
             audio_files.clear()
             audio_files.extend(paths)
@@ -238,6 +254,13 @@ def start_transcription() -> None:
     def task() -> None:
         try:
             module = ensure_process_loaded()
+            entries = module.prepare_transcription_entries(
+                sources, input_type_var.get(), output_dir_var.get()
+            )
+            skipped_initial = sum(1 for _, _, _, exists in entries if exists)
+            root.after(
+                0, lambda: skip_count_var.set(f"Skipped: {skipped_initial}")
+            )
             paths, skipped = module.transcribe_batch(
                 sources,
                 input_type_var.get(),
@@ -245,6 +268,7 @@ def start_transcription() -> None:
                 whisper_model_var.get(),
                 output_dir_var.get(),
                 progress_callback=update_progress,
+                entries=entries,
             )
             transcript_path_var.set(paths[0] if paths else "")
             texts = []
